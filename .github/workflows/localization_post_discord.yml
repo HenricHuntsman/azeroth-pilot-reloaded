@@ -58,7 +58,7 @@ jobs:
           python-version: "3.x"
 
       # --------------------------------------------------
-      # Install Chrome system dependencies (CRITICAL)
+      # Install Chrome system dependencies
       # --------------------------------------------------
       - name: Install Chrome system dependencies
         run: |
