@@ -32,7 +32,7 @@ jobs:
             echo "::error::CF_API_KEY is missing. Configure the repository Actions secret with an authorized CurseForge localization token."
             exit 1
           fi
-          echo "CurseForge API credential is configured (validity checked by export request)."
+          echo "CurseForge API credential is present; export authorization will be checked during the translation request."
 
       # -------------------------------------------------------------------
       # Checkout repository
