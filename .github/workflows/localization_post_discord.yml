@@ -94,6 +94,18 @@ jobs:
         run: |
           python -m unittest discover -s tests/scripts -p 'test_localization_post_discord.py'
 
+      # Fail early when scheduled localization cannot authenticate.
+      # Never print or publish the token; restore CF_API_KEY in Actions secrets.
+      - name: Verify CurseForge API credential is configured
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+        run: |
+          if [ -z "$CF_API_KEY" ]; then
+            echo "::error::CF_API_KEY is missing. Configure the repository Actions secret with an authorized CurseForge localization token."
+            exit 1
+          fi
+          echo "CurseForge API credential is configured (validity checked by export request)."
+
       # -------------------------------------------------------------------
       # Run localization scraper
       # -------------------------------------------------------------------
