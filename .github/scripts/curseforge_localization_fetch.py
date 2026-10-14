@@ -43,6 +43,12 @@ def fetch_localization_export(api_url: str, api_token: str) -> str:
     """
     headers = {"X-Api-Token": api_token}  # doc says X-Api-Token (case-insensitive)
     response = requests.get(api_url, headers=headers, timeout=20)
+    if response.status_code in (401, 403):
+        raise RuntimeError(
+            "CurseForge localization export denied access (HTTP "
+            f"{response.status_code}). Check CF_API_KEY and project localization "
+            "export permissions. The credential is never printed."
+        )
     response.raise_for_status()
     return response.text
 
