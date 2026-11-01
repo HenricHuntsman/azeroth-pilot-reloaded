@@ -753,7 +753,7 @@ APR.RouteQuestStepList["2248-TWW-Isle-of-Dorn"] = {
         },
         {
             Qpart = { [78464] = { 8 } },
-            ExtraLineText = "LEAVE_DELVE",
+            ExtraLineText = "LEAVE_THIS_INSTANCE",
             ExtraLineText2 = "SPEAK_TO_BRANN",
             Coord = { x = -1649.1, y = 965.1 },
             GossipOptionIDs = { 120969 },
@@ -843,7 +843,7 @@ APR.RouteQuestStepList["2248-TWW-Isle-of-Dorn"] = {
         },
         {
             Qpart = { [78463] = { 1 }, [79553] = { 1 } },
-            ExtraLineText = "OUT_CAVE",
+            ExtraLineText = "EXIT_CAVE",
             Coord = { x = -1425.6, y = 870.5 },
             Range = 125,
             Zone = 2248,
@@ -1138,7 +1138,6 @@ APR.RouteQuestStepList["2248-TWW-Isle-of-Dorn"] = {
         },
         {
             UseHS = 78570,
-            ExtraLineText = "HEARTHSTONE_TO_STONELIGHT_REST",
             Zone = 2248,
             _index = 159,
         },
@@ -1679,7 +1678,6 @@ APR.RouteQuestStepList["2248-TWW-Isle-of-Dorn"] = {
         },
         {
             UseHS = 78545,
-            ExtraLineText = "HEARTHSTONE_TO_STONELIGHT_REST",
             Zone = 2248,
             _index = 238,
         },
@@ -2373,7 +2371,7 @@ APR.RouteQuestStepList["2248-TWW-Isle-of-Dorn-campaign-only"] = {
         },
         {
             Qpart = { [78464] = { 8 } },
-            ExtraLineText = "LEAVE_DELVE",
+            ExtraLineText = "LEAVE_THIS_INSTANCE",
             ExtraLineText2 = "SPEAK_TO_BRANN",
             Coord = { x = -1649.1, y = 965.1 },
             GossipOptionIDs = { 120969 },
@@ -2822,7 +2820,6 @@ APR.RouteQuestStepList["2248-TWW-Isle-of-Dorn-campaign-only"] = {
         },
         {
             UseHS = 78545,
-            ExtraLineText = "HEARTHSTONE_TO_STONELIGHT_REST",
             Zone = 2248,
             _index = 152,
         },
@@ -3697,7 +3694,7 @@ APR.RouteQuestStepList["2248-TWW-Isle-of-Dorn-Full"] = {
         },
         {
             Qpart = { [78464] = { 8 } },
-            ExtraLineText = "LEAVE_DELVE",
+            ExtraLineText = "LEAVE_THIS_INSTANCE",
             ExtraLineText2 = "SPEAK_TO_BRANN",
             Coord = { x = -1649.1, y = 965.1 },
             GossipOptionIDs = { 120969 },
@@ -3787,7 +3784,7 @@ APR.RouteQuestStepList["2248-TWW-Isle-of-Dorn-Full"] = {
         },
         {
             Qpart = { [78463] = { 1 }, [79553] = { 1 } },
-            ExtraLineText = "OUT_CAVE",
+            ExtraLineText = "EXIT_CAVE",
             Coord = { x = -1425.6, y = 870.5 },
             Range = 125,
             Zone = 2248,
@@ -4254,7 +4251,6 @@ APR.RouteQuestStepList["2248-TWW-Isle-of-Dorn-Full"] = {
         },
         {
             UseHS = 78465,
-            ExtraLineText = "HEARTHSTONE_TO_STONELIGHT_REST",
             Zone = 2248,
             _index = 195,
         },

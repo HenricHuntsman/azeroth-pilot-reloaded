@@ -1,4 +1,4 @@
-﻿local L = LibStub("AceLocale-3.0"):NewLocale("APR", "ruRU")
+local L = LibStub("AceLocale-3.0"):NewLocale("APR", "ruRU")
 if not L then return end
 
 -- Translator: ZamestoTV

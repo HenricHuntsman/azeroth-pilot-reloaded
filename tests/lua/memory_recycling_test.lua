@@ -1,5 +1,6 @@
 -- Keep widgets rooted through their parents, as the WoW client does.
 local env = dofile("tests/lua/route_ui_test_env.lua")
+dofile("APR-Core/utils/Utils.lua")
 local step = APR.currentStep
 step:PreviousNextStepButton()
 local function render(id, item)
@@ -79,45 +80,9 @@ for index = 1, 100 do previewPass(index % 3 + 1) end
 assert(env.frames() == frames, "Image rows and thumbnail buttons are recycled after changing images")
 APR.currentStepImagePreview:ClearPreviewImages(step)
 
--- Exercise the real configuration widgets with changing rows and callbacks.
+-- Route/path viewport recycling is covered by route_browser_test.lua.
 local locale = setmetatable({}, { __index = function(_, key) return key end })
 function LibStub() return { GetLocale = function() return locale end } end
-APR.Color.grayAlpha = { 0.4, 0.4, 0.4, 0.4 }
-APR.PlayerID, APR.EXPANSIONS = "test", { Test = "Test" }
-APR.PREFAB_TYPES = { Leveling = "Leveling", AllQuests = "AllQuests", Speedrun = "Speedrun" }
-function APR:GetRouteSelectionExpansions() return { "Test" } end
-function APR:NormalizeSearchText(text) return (text or ""):lower() end
-function APR:GetRouteVisibility() return "visible" end
-function APR:GetRouteData(key) return self.RouteQuestStepList[key] end
-function APR:Contains(list, value) for _, entry in ipairs(list) do if entry == value then return true end end end
-APR.RouteQuestStepList = { first = { label = "First", expansion = "Test" }, second = { label = "Second", expansion = "Test" } }
-APRCustomPath, APRData, APRZoneCompleted = { test = {} }, { test = {} }, { test = {} }
-tinsert, tremove = table.insert, table.remove
-dofile("APR-Core/config/Config_Route.lua")
-local custom = { frame = env.widget() }
-custom.frame.contentFrame, custom.frame.scrollFrame = env.widget(), env.widget()
-local catalogue = { frame = env.widget() }
-SetCustomPathListFrame(custom); SetRouteListTab(catalogue, "Test")
-APRCustomPath.test = { "First", "Second" }
-SetCustomPathListFrame(custom); SetRouteListTab(catalogue, "Test")
-APRCustomPath.test = {}
-SetCustomPathListFrame(custom); SetRouteListTab(catalogue, "Test")
-frames, fonts = env.frames(), env.fonts()
-for index = 1, 100 do
-    APRCustomPath.test = index % 2 == 0 and { "First", "Second" } or {}
-    SetCustomPathListFrame(custom); SetRouteListTab(catalogue, "Test")
-end
-assert(env.frames() == frames and env.fonts() == fonts, "Route lists recycle both empty and populated views")
-assert(#custom.fontStringsContainer == 2 and #catalogue.fontStringsContainer == 1,
-    "Active lists retain only the displayed rows")
-local oldSecond = custom.fontStringsContainer[2]
-APRCustomPath.test = { "Second", "First" }
-SetCustomPathListFrame(custom)
-assert(custom.fontStringsContainer[1] == oldSecond and oldSecond.nameText:GetText() == "Second")
-APR.routeconfig.SendMessage = function() end
-oldSecond.downButton.scripts.OnClick()
-assert(APRCustomPath.test[1] == "First" and APRCustomPath.test[2] == "Second",
-    "Reused buttons target their current route and position")
 
 -- The actual heirloom module must keep a bounded set of buttons per toy.
 local createFrame = CreateFrame
@@ -150,4 +115,4 @@ for index = 1, 100 do
     APR.heirloom:AddHeirloomIcons()
 end
 assert(#APR.heirloom.buttons == 2 and env.frames() == frames, "Toy visibility changes reuse existing buttons")
-print("Memory recycling: 1000 step/action changes, combat deferral, 100 catalogue/path redraws and 100 heirloom refreshes passed")
+print("Memory recycling: 1000 step/action changes, combat deferral, 100 heirloom refreshes passed")

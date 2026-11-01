@@ -1,6 +1,8 @@
 -- Client filtering is hard visibility, regardless of otherwise valid level conditions.
 local L = setmetatable({}, { __index = function(_, key) return key end })
 function LibStub() return { GetLocale = function() return L end } end
+UNAVAILABLE = "Unavailable"
+DUNGEONS = "Dungeons"
 
 APR = { RouteQuestStepList = {}, interfaceVersion = 16001, Faction = "Horde" }
 function APR:NewModule() return {} end
@@ -18,8 +20,10 @@ C_Map = { GetBestMapForUnit = function() return 1411 end }
 dofile("APR-Core/utils/PlayerUtils.lua")
 dofile("APR-Core/data/models/Enums.lua")
 dofile("APR-Core/data/models/Classes.lua")
+dofile("APR-Core/utils/Utils.lua")
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/utils/RouteUtils.lua")
-dofile("APR-Core/utils/RouteManager.lua")
+dofile("APR-Core/features/questing/RouteManager.lua")
 
 -- GetBuildInfo returns fields after the interface number as well. The fallback
 -- must pass only that number to tonumber, including during file loading.
@@ -100,20 +104,23 @@ APRData = { CustomRoute = { Imported = { label = "Imported", gameVersion = "fore
 APR:LoadCustomRoutes()
 assert(APR.RouteQuestStepList.Imported.gameVersion == "forever")
 
--- Popup options must omit incompatible expansions, including unavailable placeholders.
+-- Prefab choices contain real compatible routes, and a single choice applies directly.
 APR.routeconfig = {}
 APR.Level = 12
 tinsert = table.insert
+APR.RouteQuestStepList.forever.prefab = {leveling = 1}
+APR.RouteQuestStepList.retail.expansion = APR.EXPANSIONS.TheBurningCrusade
+APR.RouteQuestStepList.retail.prefab = {leveling = 1}
 dofile("APR-Core/config/Config_Route_Prefabs.lua")
-local popupOptions
-APR.questionDialog = { CreateSelectionPopup = function(_, _, _, options) popupOptions = options end }
+local selected
+function APR.routeconfig:BuildLevelingPrefab(expansion) selected = expansion end
+APR.questionDialog = { CreateSelectionPopup = function() error("One choice should apply directly") end }
 APR.routeconfig:OpenLevelingPopup()
-assert(#popupOptions == 1 and popupOptions[1].key == APR.EXPANSIONS.Forever)
+assert(selected == APR.EXPANSIONS.Forever)
 APR.routeconfig:GetPlayerSpecRoute("Starter") -- no specialization API on Forever
 APR.interfaceVersion = 120105
 APR.routeconfig:OpenLevelingPopup()
-assert(#popupOptions > 1)
-for _, option in ipairs(popupOptions) do assert(option.key ~= APR.EXPANSIONS.Forever) end
+assert(selected == APR.EXPANSIONS.TheBurningCrusade)
 APR.interfaceVersion = 16001
 
 -- Unknown events never prevent shared quest events from registering.
@@ -130,10 +137,11 @@ end
 
 C_EventUtils = { IsEventValid = function(event) return event ~= "ACTIVE_DELVE_DATA_UPDATE" end }
 dofile("APR-Core/core/Event.lua")
-APR.event:MyRegisterEvent()
+dofile("APR-Core/features/questing/NPCInteraction.lua")
+APR.event:RegisterEvents()
 assert(registered.QUEST_ACCEPTED and registered.QUEST_LOG_UPDATE)
 assert(not registered.ACTIVE_DELVE_DATA_UPDATE)
 C_EventUtils = nil
-APR.event:MyRegisterEvent()
+APR.event:RegisterEvents()
 assert(registered.HEARTHSTONE_BOUND)
 print("Client compatibility: visibility, saved routes, API fallbacks and event registration passed")

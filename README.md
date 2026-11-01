@@ -2,16 +2,16 @@
 
 <p align="center">
   <a href="https://www.curseforge.com/wow/addons/azeroth-pilot-reloaded">
-    <img src="readme/assets/banner-rounded.svg" alt="Azeroth Pilot Reloaded" width="1000">
+    <img src="readme/assets/banner-rounded.svg" alt="Azeroth Pilot Reloaded — World of Warcraft leveling guide addon" width="1000">
   </a>
 </p>
 
-<h1 align="center">Your adventure. A clear path.</h1>
+<h1 align="center">Azeroth Pilot Reloaded — Leveling Guide for World of Warcraft</h1>
 
 <p align="center">
-  A quest routing and leveling addon for <strong>World of Warcraft</strong>.<br>
-  Follow the arrow, complete each objective, and shape the journey around your character.<br>
-  The continuation, optimization, and rewrite of <strong>Azeroth Auto Pilot</strong>.
+  <strong>Azeroth Pilot Reloaded (APR)</strong> is a free, open-source WoW leveling addon with in-game, step-by-step quest guides.<br>
+  Follow the waypoint arrow, track quest objectives, and choose leveling, speedrun, or campaign routes for your character.<br>
+  The continuation, optimization, and rewrite of <strong>Azeroth Auto Pilot (AAP)</strong>. Your adventure. A clear path.
 </p>
 
 <p align="center">
@@ -66,6 +66,14 @@
     </td>
   </tr>
 </table>
+
+### Controller support (WoW Forever)
+
+Enable WoW Forever's native gamepad interface, then assign **APR → Gamepad menu** in WoW's key bindings. Alternatively, open the **Gamepad menu** button at the top of the APR window (or `/apr gamepad`), choose **Key Bindings**, and press your controller button or modifier combination. APR asks before replacing an existing binding. Routes, options, skip, rollback and current-step controls also have individual bindings.
+
+APR windows use Forever's native focus, confirmation, Back and right-stick scrolling. Left/right follows adjacent route buttons. Confirm or secondary click enters a settings category or tab; Back returns to its heading. Route lists remain navigable beyond the visible rows; slider settings use left/right to adjust and up/down to leave. Colours, panel placement and image zoom/pan have controller controls. **Use quest item** activates an available step action through a secure button.
+
+See [controller controls and in-game checks](docs/gamepad.md) for setup, combat behavior and verification limits.
 
 > [!TIP]
 > **Take control of an interaction.** Hold <kbd>Ctrl</kbd>, <kbd>Shift</kbd>, or <kbd>Alt</kbd> when interacting with an NPC, flight master, or merchant to bypass the corresponding interaction automation. These modifiers also bypass cutscene skipping. Item and spell buttons require your click or key press.

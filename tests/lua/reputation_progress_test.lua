@@ -69,6 +69,7 @@ assert(APR:GetReputationBarProgress(requirement) == nil)
 
 -- Load the actual frame module, exercising parent visibility, reuse and font relayout.
 local methods, bars = {}, 0
+function methods:GetFrameLevel() return self.level or 1 end
 local function object(parent)
     return setmetatable({ parent = parent, shown = true, scripts = {}, height = 12 },
         {
@@ -125,6 +126,7 @@ function APR:GetSettingsProfile() return self.settings.profile end
 function APR:RegisterFontString(font, _, options) font.onApplied = options.onApplied end
 
 APR.SetupHeaderDrag, APR.SetupMinimizeButton = noop, noop
+dofile("APR-Core/ui/foundations/Themes.lua")
 dofile("APR-Core/utils/UIUtils.lua")
 dofile("APR-Core/ui/foundations/StatusBars.lua")
 APR.SetupHeaderDrag, APR.SetupMinimizeButton = noop, noop

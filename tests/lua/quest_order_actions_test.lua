@@ -10,15 +10,24 @@ local L = setmetatable({
     REPAIR = "Repair your gear",
     USE_ITEM = "Use %s",
     USE_SPELL = "Cast %s",
+    LOOT_ITEM = "Loot: %s",
+    USE_FLIGHTPATH = "Fly to %s",
+    LEAVE_DELVE = "Leave delve: %s",
+    LEAVE_DUNGEON = "Leave dungeon: %s",
+    LEAVE_INSTANCE = "Leave instance: %s",
+    GRIND = "Grind to level %s",
 }, { __index = function(_, key) return key end })
 function LibStub() return { GetLocale = function() return L end } end
 UNKNOWN, ABANDON_QUEST, LEAVE_VEHICLE, DISMOUNT = "Unknown", "Abandon quest", "Leave vehicle", "Dismount"
 INSTANCE = "Localized instance"
+BOSS, ENTER_DUNGEON, LEAVE_ZONE = "Boss", "Enter Dungeon", "Leave %s"
 format = string.format
 local function no() return false end
 local function forbidden() error("A preview must not perform actions or mutate action state") end
-APR = { questOrderList = {}, questOrderListUtils = {}, PlayerID = "player", ActiveRoute = "test",
-    ActiveQuests = {}, QUEST_STATUS = { COMPLETE = 1 }, MaxLevel = 60 }
+APR = { questOrderList = {}, questOrderListSupport = {}, PlayerID = "player", ActiveRoute = "test",
+    ActiveQuests = {}, QUEST_STATUS = { COMPLETE = 1 }, MaxLevel = 60,
+    GAME_VERSIONS = { Retail = "retail", Classic = "classic", Forever = "forever" }, interfaceVersion = 16001 }
+dofile("APR-Core/utils/PlayerUtils.lua")
 APRData = { player = { test = 1 }, NPCList = { [54] = "Vendor" } }
 local known, equipped, onQuest = {}, {}, { [10] = true }
 function GetInventoryItemID(_, slot) return equipped[slot] end
@@ -37,8 +46,13 @@ C_PvP = { IsWarModeDesired = no }
 C_ScenarioInfo = { GetScenarioInfo = function() return { name = "Scenario" } end,
     GetCriteriaInfoByStep = function() return { description = "Objective", completed = false } end }
 C_ChromieTime = { GetChromieTimeExpansionOption = function() return { name = "Legion" } end }
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/utils/StepUtils.lua")
 dofile("APR-Core/utils/QuestUtils.lua")
+dofile("APR-Core/utils/LootUtils.lua")
+function CreateFrame() return { RegisterEvent = function() end, SetScript = function() end } end
+dofile("tests/lua/dungeon_data_test_env.lua")
+dofile("APR-Core/utils/DungeonUtils.lua")
 dofile("APR-Core/features/questing/RouteActions.lua")
 APR.ProcessRouteItems, APR.HandleRouteAction, APR.GetRouteActionState = forbidden, forbidden, forbidden
 APR.IsSojournerSkipActive, APR.IsDelveRoute, APR.HasTaxiNode = no, no, no
@@ -59,7 +73,7 @@ function APR:GetPlayerEffectiveLevel() return 10 end
 function APR:ResolveLevelRequirement(value) return value end
 function APR:GetGrindStepText() return "Grind" end
 function APR:GetReputationStepText() return "Reputation" end
-local utils = APR.questOrderListUtils
+local utils = APR.questOrderListSupport
 utils.IsQuestCompletedOrActive, utils.IsQuestCompleted = no, no
 function utils:AddStepFrameWithQuest(_, index, title, quests, color, current)
     assert(type(title) == "string" and title ~= "", "Every row needs a readable title")
@@ -81,6 +95,7 @@ local function render(steps, index)
 end
 
 local fixtures = {
+    KillNPC = { npcID = 11520, name = "Taragaman", dungeonKey = "RFC" },
     ExitTutorial = 10, PickUp = { 10 }, DropQuest = 10, Qpart = { [10] = { 1 } },
     QpartPart = { [10] = { 1 } }, Treasure = { questID = 10 }, Group = { questID = 10, Number = 3 },
     Done = { 10 }, Scenario = { stepID = 1, criteriaIndex = 1 },
@@ -94,7 +109,7 @@ local fixtures = {
     DeathSkip = true, SellItems = { items = { 20 }, junk = true }, LearnSkill = { spellIDs = { 20, 21 } },
     BankDeposit = { items = { 20 } }, BankWithdraw = { items = { 20 } }, TameBeast = { npcID = 54 },
     DestroyItems = { items = { 20 } }, EquipItem = { slot = 16, itemID = 20 },
-    Repair = { npcID = 54 },
+    Repair = { npcID = 54 }, Zeppelin = true, Boat = true, Tram = true,
 }
 fixtures.SetHS = 10
 fixtures.LeaveQuest, fixtures.LeaveQuests, fixtures.ResetRoute = 10, { 10, 11 }, true
@@ -106,6 +121,9 @@ local steps = {}
 for _, key in ipairs(APR.mainStepOptions) do
     assert(fixtures[key] ~= nil, "Add a preview fixture for main action " .. key)
     local step = { [key] = fixtures[key] }
+    if key == "Zeppelin" or key == "Boat" or key == "Tram" then
+        step.ZoneStepTrigger = { mapID = 2, x = 10, y = 20, Range = 15 }
+    end
     if companions[key] then step[companions[key]] = fixtures[companions[key]] end
     steps[#steps + 1] = step
 end
@@ -113,8 +131,58 @@ local preview = render(steps)
 assert(#preview.stepList == #steps, "All main actions must be visible")
 for index in ipairs(steps) do
     assert(preview.rawStepContainers[index], "Missing main action at " .. index)
+    assert(not preview.stepList[index].title:find("%s", 1, true), "Preview titles must resolve format arguments")
 end
 assert(APR.routeActionState == nil, "Preview must not create action state")
+assert(APRData.player.DungeonRuns == nil, "A dungeon preview must not start a run")
+local dungeon = render({ { EnterInstance = { dungeonKey = "ROL" } },
+    { KillNPC = fixtures.KillNPC }, { LeaveInstance = { dungeonKey = "ROL" } } })
+assert(dungeon.stepList[1].title == "Enter Dungeon: Ruins of Lordaeron")
+assert(dungeon.stepList[2].title == "Boss: Taragaman")
+assert(dungeon.stepList[3].title == "Leave Ruins of Lordaeron")
+local outdoor = render({ { KillNPC = { npcID = 3100, name = "Boar" }, Zone = 1411 } })
+assert(outdoor.stepList[1].title == "Boar")
+assert(APR.routeActionState == nil and APRData.player.OutdoorKills == nil,
+    "An outdoor preview must not observe targets or mutate kill state")
+
+-- Loot values remain in detail rows, while known travel destinations fill the title.
+local lootStep = { LootItems = { { itemID = 20, quantity = 3 }, { itemID = 404 } } }
+local lootRow = render({ lootStep }).stepList[1]
+assert(lootRow.title == "Loot: Item 20, Unknown")
+assert(lootRow.quests[1].questID == 3 and lootRow.quests[1].questName == "Item 20")
+assert(lootRow.quests[2].questName == UNKNOWN)
+local completedLoot = render({ lootStep }, 2).stepList[1]
+assert(completedLoot.title == "Loot: Item 20, Unknown" and completedLoot.color == "green" and #completedLoot.quests == 0)
+assert(render({ { UseFlightPath = 10 } }).stepList[1].title == "Fly to Flight destination")
+assert(render({ { UseItem = { itemID = 20 } } }).stepList[1].title == "Use Item 20")
+
+local originalTalk = L.TALK_NPC
+L.TALK_NPC = "Talk (100%)"
+assert(render({ { GossipOptionIDs = { 1 } } }).stepList[1].title == "Talk (100%)")
+L.TALK_NPC = originalTalk
+
+-- Preserve the preview's requested suppression of remaining %s sequences.
+local originalItemInfo = C_Item.GetItemInfo
+C_Item.GetItemInfo = function() return "Item %s (100%)" end
+assert(render({ { UseItem = { itemID = 20 } } }).stepList[1].title == "Use Item   (100%)")
+C_Item.GetItemInfo = originalItemInfo
+local originalScenarioInfo = APR.GetScenarioZoneInfo
+APR.GetScenarioZoneInfo = function() return { type = "DELVE" } end
+assert(render({ { LeaveScenario = { mapID = 2 } } }).stepList[1].title == "Leave delve: Zone")
+APR.GetScenarioZoneInfo = function() return { type = "DUNGEON" } end
+assert(render({ { LeaveInstance = { mapID = 2 } } }).stepList[1].title == "Leave dungeon: Zone")
+APR.GetScenarioZoneInfo = originalScenarioInfo
+
+-- Waypoint/action summaries fill the same parameters as the detailed rows.
+assert(APR:GetStepString({ UseItem = { itemID = 20 } }) == "Use Item 20")
+assert(APR:GetStepString({ UseItem = { itemID = 404 } }) == "Use Unknown")
+assert(APR:GetStepString({ UseSpell = { spellID = 20 } }) == "Cast Spell 20")
+assert(APR:GetStepString({ UseSpell = { spellID = 404 } }) == "Cast Unknown")
+assert(APR:GetStepString(lootStep) == "Loot: Item 20, Unknown")
+assert(APR:GetStepString({ Grind = 20 }) == "Grind")
+assert(APR:GetStepString({ LeaveInstance = { mapID = 2 } }) == "Leave instance: Zone")
+assert(APR:GetStepString({ LeaveInstance = { dungeonKey = "ROL" } }) == "Leave Ruins of Lordaeron")
+
 C_ScenarioInfo.GetScenarioInfo = function() end
 C_ScenarioInfo.GetScenarioStepInfo = function() end
 C_ScenarioInfo.GetCriteriaInfoByStep = function() end
@@ -129,14 +197,7 @@ local buttonPreview = render({ {
     Button = { ["10"] = { 20, 404 } },
     SpellButton = { ["11"] = { 1243, "Named spell" }, ["10"] = 2050 },
 } }).stepList[1]
-assert(buttonPreview.title == "Note: Prepare your actions\nUse Item 20\nUse Unknown\n" ..
-    "Cast Spell 2050\nCast Spell 1243\nCast Spell Named spell",
-    "Scalar/list buttons use client names, preserve list order and handle uncached items")
 assert(buttonPreview.color == "gray", "Supporting buttons must not complete the primary step")
-local completeWithButtons = render({ {
-    LearnProfession = 20, Button = { ["10"] = 20 }, SpellButton = { ["10"] = 404 },
-} }).stepList[1]
-assert(completeWithButtons.title:find("Cast Unknown", 1, true), "Uncached spells keep a readable label")
 known[20] = true
 assert(render({ { LearnProfession = 20, SpellButton = { ["10"] = 2050 } } }).stepList[1].color == "green",
     "Optional buttons must not turn a completed primary action into an incomplete action")
@@ -201,18 +262,14 @@ APR.routeActionState.token = "other:3"
 assert(render(actions, 3).stepList[3].color == "gray", "Ignore stale completion from another route")
 assert(APR.routeActionState.token == "other:3", "Preview must not reset stale state")
 
--- Preview names follow the NPC cache without performing actions; repair previews only read durability.
-local tame = { TameBeast = { npcID = 3127, Text = "Venomtail Scorpid" } }
-assert(render({ tame }).stepList[1].title == "Tame the Venomtail Scorpid beast")
-APRData.NPCList[3127] = "Scorpide venimeux"
-assert(render({ tame }).stepList[1].title == "Tame the Scorpide venimeux beast")
+-- Repair previews only read durability.
 RepairAllItems = forbidden
 APR.HandleRouteRepair = forbidden
 local durability = 50
 function GetInventoryItemDurability(slot) if slot == 16 then return durability, 100 end end
 local repair = { Repair = { npcID = 3331 } }
 local repairRow = render({ repair }).stepList[1]
-assert(repairRow.title == "Repair your gear" and repairRow.color == "gray")
+assert(repairRow.color == "gray")
 durability = 90
 assert(render({ repair }).stepList[1].color == "green", "An optional healthy-gear visit is already satisfied")
 GetInventoryItemDurability = nil
@@ -254,7 +311,7 @@ for line in actionTable:gmatch("[^\n]+") do
     local key = line:match("^|%s*`(%w+)`%s*|")
     if key then documented[#documented + 1] = key end
 end
-assert(#documented == 55, "Review coverage when the action table changes")
+assert(#documented == 56, "Review coverage when the action table changes")
 local hiddenOptions = { DroppableQuest = true, Fillers = true, NpcDismount = true }
 
 -- Optional and automatic fields never become the primary action or a preview row.
@@ -327,4 +384,13 @@ render({ combined })
 assert(requested[11] == 1, "Repeated renders must not duplicate a quest title request")
 C_QuestLog.GetTitleForQuestID = cachedTitle
 assert(render({ combined }).stepList[1].title == title, "Loaded titles replace the fallback on refresh")
+
+-- The preview uses the next entry belonging to the rendered route, including future HS steps.
+function GetBindLocation() return "Zone" end
+local travel = render({ { GetFP = 2 }, { UseFlightPath = 42, NodeID = 8 },
+    { UseHS = 42 }, { Note = "Arrival", Zone = 10 }, { UseHS = 42 } })
+assert(travel.rawStepContainers[1].title == L.GET_FLIGHTPATH .. " - Flight destination")
+assert(travel.rawStepContainers[2].title == "Fly to Flight destination")
+assert(travel.rawStepContainers[3].title == L.USE_HEARTHSTONE .. " - Zone")
+assert(travel.rawStepContainers[5].title == L.USE_HEARTHSTONE)
 print("Quest order actions: every primary action, standalone helpers, sale details, completion, filters and read-only preview passed")

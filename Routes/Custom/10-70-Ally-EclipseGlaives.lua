@@ -2,6 +2,8 @@ local L = LibStub("AceLocale-3.0"):GetLocale("APR")
 
 APR.RouteQuestStepList["84-EclipseGlaives-10-to-70"] = {
     label = L["10-70 route by EclipseGlaives"],
+    author = "EclipseGlaives",
+    community = true,
     expansion = APR.EXPANSIONS.Vanilla,
     category = APR.CATEGORIES.Leveling,
     prefab = {
@@ -15,8 +17,7 @@ APR.RouteQuestStepList["84-EclipseGlaives-10-to-70"] = {
         {
             PickUp = { 40519 },
             ChromiePick = 10,
-            ExtraLineText = "SWITCH_TO_CHROMIE",
-            ExtraLineText2 = "SKYRIDING_HIGHLY_RECOMMENDED",
+            ExtraLineText = "SKYRIDING_HIGHLY_RECOMMENDED",
             Coord = { x = 747.5, y = -8194.6 },
             GossipOptionIDs = { 51901, 51902 },
             Zone = 84,
@@ -33,6 +34,7 @@ APR.RouteQuestStepList["84-EclipseGlaives-10-to-70"] = {
             ExtraLineText = "NPC_TELEPORT",
             ExtraLineText2 = "MANUAL_SKIP",
             Coord = { x = 1078.4, y = -8494.8 },
+            IsQuestUncompleted = 44184,
             Zone = 84,
             _index = 3,
         },
@@ -2314,7 +2316,6 @@ APR.RouteQuestStepList["84-EclipseGlaives-10-to-70"] = {
         {
             PickUp = { 34398 },
             ChromiePick = 9,
-            ExtraLineText = "SWITCH_TO_CHROMIE",
             Coord = { x = 745.5, y = -8196.4 },
             GossipOptionIDs = { 51901, 51902 },
             Zone = 84,

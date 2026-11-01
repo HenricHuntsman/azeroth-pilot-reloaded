@@ -3,7 +3,9 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+
 from lupa.lua51 import LuaRuntime, lua_type
+from tools.validation.instrument_lua import clean
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,11 +29,15 @@ class RouteCatalog:
     profiles: set
 
 
-def load_routes(paths=None):
+def load_routes(paths=None, translations=None):
     runtime = LuaRuntime(unpack_returned_tuples=True, register_eval=False, register_builtins=False)
+    runtime.globals().routeTranslations = runtime.table_from(translations or {})
     runtime.execute('''
-        local locale = setmetatable({}, {__index = function(_, key) return key end})
-        function LibStub() return {GetLocale = function() return locale end} end
+        local locale = setmetatable(routeTranslations, {__index = function(_, key) return key end})
+        routeTranslations = nil
+        function GetLocale() return "enUS" end
+        function LibStub() return {GetLocale = function() return locale end, GetText = function(_, key) return locale[key] end} end
+        DUNGEONS = "DUNGEONS"
         APR = {}
     ''')
     for name in ("APR-Core/data/models/Enums.lua", "APR-Core/data/models/Classes.lua",
@@ -49,6 +55,7 @@ def load_routes(paths=None):
         local apr = {DelveRouteRegistry = {}, worldCoordinateConverter = {}}
         apr.worldCoordinateConverter.GetMixedAreaCenter = APR.worldCoordinateConverter.GetMixedAreaCenter
         apr.worldCoordinateConverter.GetMixedAreaRadius = APR.worldCoordinateConverter.GetMixedAreaRadius
+        apr.worldCoordinateConverter.ConvertMapTrigger = APR.worldCoordinateConverter.ConvertMapTrigger
         for _, name in ipairs({"CATEGORIES", "EXPANSIONS", "PREFAB_TYPES", "GAME_VERSIONS",
             "RACES", "Classes", "Specs", "EVENTS", "REPUTATION_TYPE", "REPUTATION_STANDING"}) do
             apr[name] = setmetatable(APR[name], {__index = unknown})
@@ -67,7 +74,7 @@ def load_routes(paths=None):
             end
         })
         setmetatable(apr, {__index = unknown})
-        local env = setmetatable({APR = apr, LibStub = LibStub, ipairs = ipairs, pairs = pairs,
+        local env = setmetatable({APR = apr, LibStub = LibStub, GetLocale = GetLocale, ipairs = ipairs, pairs = pairs,
             type = type, tostring = tostring, tonumber = tonumber, table = {insert = table.insert},
             math = {min = math.min, max = math.max}, string = {format = string.format}},
             {__index = unknown, __newindex = unknown})
@@ -85,7 +92,9 @@ def load_routes(paths=None):
     sources = {}
     for path in sorted(paths if paths is not None else (ROOT / "Routes").rglob("*.lua")):
         name = path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else str(path)
-        execute(path.read_text(encoding="utf-8-sig"), "@" + name)
+        # Runtime diagnostics are not part of the declaration language. Strip
+        # generated probes rather than exposing extra APIs in this sandbox.
+        execute(clean(path.read_text(encoding="utf-8-sig")), "@" + name)
         for key in registry.keys():
             sources.setdefault(key, name)
     return RouteCatalog(plain(registry), sources, enums, profiles)

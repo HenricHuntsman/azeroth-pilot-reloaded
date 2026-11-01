@@ -84,6 +84,7 @@ C_UnitAuras = {
         queries = queries + 1; return aura
     end
 }
+dofile("APR-Core/ui/foundations/Themes.lua")
 dofile("APR-Core/features/player/Buff.lua")
 APR.Buff.RefreshFrameAnchor = noop
 aura = { spellId = 123, auraInstanceID = 42, icon = 123 }
@@ -125,7 +126,9 @@ APR.currentStep = {
         assert(filter == nil); usability = usability + 1
     end,
 }
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/core/Event.lua")
+dofile("APR-Core/features/questing/NPCInteraction.lua")
 APR.event.functions.buffs("UNIT_AURA", secret, restrictedTable)
 assert(refreshed == 1)
 APR.event.functions.spell("UNIT_SPELLCAST_SUCCEEDED", secret, secret, secret)

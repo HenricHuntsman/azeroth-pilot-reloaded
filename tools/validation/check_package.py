@@ -1,7 +1,53 @@
-"""Validate client-specific route loading in one unpacked APR release."""
+"""Validate runtime dependencies and client-specific loading in an APR release."""
 from pathlib import Path
 import argparse
+import re
 import xml.etree.ElementTree as ET
+
+
+def read_manifest(path):
+    text = path.read_text(encoding='utf-8-sig')
+    # WoW accepts the shared xsi schema prefix without a local declaration;
+    # Embedded library manifests can rely on that convention.
+    if 'xsi:' in text and 'xmlns:xsi=' not in text:
+        text = re.sub(r'<Ui\b', '<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"', text, count=1)
+    return ET.fromstring(text)
+
+
+def validate_runtime_files(root, toc, game):
+    visited = set()
+
+    def visit(path):
+        assert path.is_file(), f'Missing runtime dependency: {path.relative_to(root)}'
+        if path in visited or path.suffix != '.xml':
+            return
+        visited.add(path)
+        for element in read_manifest(path).iter():
+            if element.tag.rsplit('}', 1)[-1] not in ('Include', 'Script') or 'file' not in element.attrib:
+                continue
+            reference = element.attrib['file'].replace('\\', '/').replace('[Game]', game)
+            nested = path.parent / reference
+            visit(nested if nested.is_file() else root / reference)
+
+    for line in toc.read_text(encoding='utf-8-sig').splitlines():
+        if line.strip() and not line.lstrip().startswith('#'):
+            visit(root / line.strip().replace('\\', '/').replace('[Game]', game))
+
+
+def validate_runtime_only(root):
+    for name in ('tools', 'tests', 'docs', 'readme', '.github', '.githooks', '.vscode', '.cache', '.venv'):
+        assert not (root / name).exists(), f'Development files must not be distributed: {name}'
+    for path in root.rglob('*'):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root)
+        # The packager generates the release changelog; license notices also stay.
+        if str(relative) == 'CHANGELOG.md' or path.name.upper().startswith(('LICENSE', 'COPYING')):
+            continue
+        assert not any(part.startswith('.') for part in relative.parts), f'Repository metadata in package: {relative}'
+        assert path.suffix.lower() not in ('.md', '.svg', '.json', '.py', '.cmd', '.yml', '.yaml'), \
+            f'Development source in package: {relative}'
+        assert not (path.suffix == '.toc' and len(relative.parts) > 1), f'Standalone library TOC in package: {relative}'
 
 
 def route_entries(toc):
@@ -9,23 +55,12 @@ def route_entries(toc):
             if line.strip().startswith('Routes/')]
 
 
-def validate_farstrider(root, toc, game):
-    entry = 'APR-Core/libs/FarstriderLibData_[Game].xml'
+def validate_navigation(root, toc, game):
     entries = [line.strip().replace('\\', '/') for line in toc.read_text(encoding='utf-8-sig').splitlines()]
-    assert entries.count(entry) == 1, f'{toc.name} must select Farstrider data by client'
-    manifest = root / entry.replace('[Game]', game)
-    includes = [element.attrib['file'].replace('\\', '/') for element in ET.parse(manifest).getroot()]
-    flavor = 'Vanilla' if game == 'Camelot' else 'Standard'
-    expected = ['FarstriderLibData.xml', f'libs/FarstriderLibData/Areas/{flavor}/FarstriderLibData_Areas.xml']
-    expected.append(f'libs/FarstriderLibData/Waypoints/{flavor}/FarstriderLibData_Waypoints.xml')
-    expected.append('FarstriderLibData_Finalizer.xml')
-    assert includes == expected, f'Wrong Farstrider data or load order for {game}'
-    for include in includes:
-        nested = manifest.parent / include
-        assert nested.is_file(), f'Missing Farstrider manifest: {nested}'
-        for element in ET.parse(nested).getroot():
-            reference = element.attrib['file'].replace('\\', '/')
-            assert (nested.parent / reference).is_file(), f'Missing Farstrider dependency: {reference}'
+    entry = 'APR-Core/libs/LibAPRNavigation-1.0/LibAPRNavigation.xml'
+    assert entries.count(entry) == 1, f'{toc.name} must load the navigation catalogue once'
+    assert not any('Farstrider' in line for line in entries if line and not line.startswith('#')), 'Legacy navigation must not be loaded'
+    assert (root / entry).is_file(), 'Missing navigation catalogue'
 
 
 def validate(root):
@@ -37,20 +72,21 @@ def validate(root):
     forever_toc = forever.read_text(encoding='utf-8-sig')
     assert '## Interface: 16001' in forever_toc
     assert '120105' not in forever_toc.splitlines()[0]
-    validate_farstrider(root, retail, 'Standard')
-    validate_farstrider(root, forever, 'Camelot')
-    validate_farstrider(root, root / 'APR.toc', 'Standard')
+    validate_navigation(root, retail, 'Standard')
+    validate_navigation(root, forever, 'Camelot')
+    validate_navigation(root, root / 'APR.toc', 'Standard')
+    for toc, game in ((retail, 'Standard'), (forever, 'Camelot'), (root / 'APR.toc', 'Standard')):
+        validate_runtime_files(root, toc, game)
     manifests = [root/'Routes/RouteList_Standard.xml', root/'Routes/RouteList_Camelot.xml']
     scripts = []
     for manifest in manifests:
-        entries = [element.attrib['file'] for element in ET.parse(manifest).getroot()]
+        entries = [element.attrib['file'] for element in read_manifest(manifest)]
         assert all((root / entry).is_file() for entry in entries)
         assert len(entries) == len(set(entries)), f'Duplicate route in {manifest.name}'
         scripts.append(set(entries))
     assert not scripts[0] & scripts[1], 'A route file is loaded by both client families'
-    assert not (root/'tools').exists(), 'Local tooling must not be distributed'
-    assert not (root/'tests').exists(), 'Tests must not be distributed'
-    print(f'Package passed: one addon, Retail ({len(scripts[0])} files), Forever ({len(scripts[1])} files), client-specific Farstrider data, no local tools')
+    validate_runtime_only(root)
+    print(f'Package passed: one addon, Retail ({len(scripts[0])} files), Forever ({len(scripts[1])} files), complete runtime dependencies, no development files')
 
 
 if __name__ == '__main__':

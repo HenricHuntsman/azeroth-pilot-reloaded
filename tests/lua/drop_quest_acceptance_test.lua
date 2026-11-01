@@ -88,17 +88,25 @@ local ukor = {
 }
 local current = ukor
 function APR:GetRouteSteps() return { current, { PickUp = { 42 } } } end
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/utils/StepUtils.lua")
 function APR:GetStep() return current end
 dofile("APR-Core/utils/QuestUtils.lua")
 dofile("APR-Core/utils/RouteUtils.lua")
 APR.SkipStepCondition = noop
+dofile("APR-Core/features/questing/StepInstructions.lua")
+dofile("APR-Core/features/questing/StepQuestHandlers.lua")
+dofile("APR-Core/features/questing/StepTravelHandlers.lua")
+dofile("APR-Core/features/questing/StepActionHandlers.lua")
+dofile("APR-Core/features/questing/StepRenderer.lua")
+dofile("APR-Core/features/questing/QuestCache.lua")
 dofile("APR-Core/features/questing/QuestHandler.lua")
 APR.ResetMissingQuests = noop
 APR.UpdateQuest = noop
 function APR:UpdateNextStep() advanced = advanced + 1 end
 function APR:NextQuestStep() advanced = advanced + 1 end
 dofile("APR-Core/core/Event.lua")
+dofile("APR-Core/features/questing/NPCInteraction.lua")
 APR.event.TalkToDenyNpcLogic = noop
 
 local function dispatch(tag, event)

@@ -55,14 +55,17 @@ function APR:NewModule() return {} end
 function APR:Contains(values, value) return tContains(values, value) end
 
 dofile("APR-Core/data/models/Enums.lua")
-dofile("APR-Core/data/zones/ScenarioEntrances.lua")
+dofile("tests/lua/navigation_entrance_test_env.lua")("retail")
+dofile("APR-Core/integrations/NavigationEntrances.lua")
 dofile("APR-Core/utils/Utils.lua")
 dofile("APR-Core/utils/PlayerUtils.lua")
 dofile("APR-Core/utils/QuestUtils.lua")
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/utils/RouteUtils.lua")
-dofile("APR-Core/utils/RouteManager.lua")
+dofile("APR-Core/features/questing/RouteManager.lua")
 dofile("APR-Core/features/navigation/WorldCoordinateConverter.lua")
 dofile("APR-Core/core/Event.lua")
+dofile("APR-Core/features/questing/NPCInteraction.lua")
 function APR:GetPlayerEffectiveLevel() return level end
 
 function APR:IsDelveRoute() return false end
@@ -200,6 +203,12 @@ check(APR.worldCoordinateConverter:ConvertMapCoordinate(2393, 25, 75) == nil,
 C_Map.GetWorldPosFromMapPos = projection
 
 -- Exercise the real scenario handler with a reserved reward after a reload.
+dofile("APR-Core/features/questing/StepInstructions.lua")
+dofile("APR-Core/features/questing/StepQuestHandlers.lua")
+dofile("APR-Core/features/questing/StepTravelHandlers.lua")
+dofile("APR-Core/features/questing/StepActionHandlers.lua")
+dofile("APR-Core/features/questing/StepRenderer.lua")
+dofile("APR-Core/features/questing/QuestCache.lua")
 dofile("APR-Core/features/questing/QuestHandler.lua")
 local scenarioStep, parentMap
 local function noop() end
@@ -262,7 +271,7 @@ scenarioResult("EnterScenario", 2405, "SCENARIO_STAY")
 
 -- A suggested guide replaces nearby DoScenario while retaining its quest setup.
 level = 80
-dofile("APR-Core/utils/DelveRouteUtils.lua")
+dofile("APR-Core/features/questing/DelveRoutes.lua")
 dofile("APR-Core/utils/StepUtils.lua")
 
 local inferredScenarioStep = { PickUp = { 93427 }, Zone = 2528 }
@@ -287,6 +296,11 @@ APRData.test[routeKey] = 1
 _, _, migratedRouteKey = APR:GetCurrentRouteMapIDsAndName()
 check(migratedRouteKey == routeKey and APRCustomPath.test[1] == route.label,
     "The live stable key recovers a renamed route during the same session")
+
+APRCustomPath.test = {}
+local emptyMaps, emptyMapID, emptyRouteKey = APR:GetCurrentRouteMapIDsAndName()
+check(emptyMaps == nil and emptyMapID == 0 and emptyRouteKey == "",
+    "An empty path cannot resurrect the active route through display-name recovery")
 
 local missingRouteError, missingRoutePopup, emptyPathChecks
 APRCustomPath.test = { "Deleted route", route.label }

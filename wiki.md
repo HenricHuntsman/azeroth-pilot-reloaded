@@ -24,7 +24,8 @@
 | `label` | Display name shown in the route list. | `label = "Midnight - Speedrun"` |
 | `mapID` | Main map ID for the route. Used as route metadata and zone fallback. | `mapID = 2393` |
 | `nextRoute` | Follow-up route keys. Conditional entries must also pass the target route's selection rules. | `nextRoute = { "Shared", { route = "Class", conditions = { Class = "MAGE" } } }` |
-| `parallelSteps` | Insert eligible groups at the current position, or after the current `InstanceQuest` block. Inserted groups remain even if conditions change. | `parallelSteps = { { conditions = { MinLevel = 88 }, steps = { ... } } }` |
+| `parallelSteps` | Declare before `steps`. Insert eligible groups at the current position, or after the current `InstanceQuest` block. Single `EquipItem`/`UseItem` actions inherit live group conditions; other groups retain activation-only conditions. | `parallelSteps = { { conditions = { MinLevel = 88 }, steps = { ... } } }` |
+| `parallelSteps[].repeatable` | For a single `UseItem` action, allow a fresh activation after the previous action was passed and the conditions became false then true (for example, another book was received). | `repeatable = true` |
 | `prefab` | Prefab membership and ordering. Entry conditions select membership without hiding manual route selection. | `prefab = { [APR.PREFAB_TYPES.Speedrun] = { index = 20, conditions = { Class = "MAGE" } } }` |
 | `requiredRoute` | Required route keys. Applicable unfinished requirements are added before this route; hard visibility failures waive them, temporary level/spec/zone restrictions do not. | `requiredRoute = { "2432-Midnight-Intro" }` |
 | `steps` | Main ordered list of route steps. | `steps = { { PickUp = { 86733 } }, ... }` |
@@ -70,7 +71,7 @@ An action waits for completion; a failed step condition skips the step. Use one 
 | `DroppableQuest` | Defines passive or active dropped-quest tracking. When used without `DropQuest`, it behaves like a filler hint. | `DroppableQuest = { Qid = 41234, MobId = 133713, Text = "Fel Marauder" }` |
 | `DropQuest` | Quest obtained from a mob drop. Must be paired with a corresponding `DroppableQuest`. | `DropQuest = 48876` |
 | `Emote` | Requires performing an emote on a target or at a step. | `Emote = { emote = "salute", npcID = 12345 }` |
-| `EnterInstance` | Guides the player into an instance. | `EnterInstance = { questID = 12345, mapID = 2505 }` |
+| `EnterInstance` | Guides the player into an instance. Forever dungeon checkpoints use `dungeonKey` to match the instance ID. | `EnterInstance = { questID = 12345, mapID = 2505 }` or `{ dungeonKey = "RFC" }` |
 | `EnterScenario` | Guides the player to a scenario entrance. | `EnterScenario = { questID = 86636, mapID = 2502 }` |
 | `ExitTutorial` | Exile's Reach specific step that auto-skips if the exit quest is no longer tracked. | `ExitTutorial = 59985` |
 | `Fillers` | Optional side objectives that can progress during any step without blocking the route. | `Fillers = { [49529] = { 1 }, [49897] = { 1 } }` |
@@ -78,9 +79,10 @@ An action waits for completion; a failed step condition skips the step. Use one 
 | `Grind` | Wait until the level/XP threshold is reached; supports numbers, absolute XP and named profiles. | `Grind = 60` |
 | `Group` | Marks an optional group quest and shows a popup (`questID`, `Number`). | `Group = { questID = 51384, Number = 3 }` |
 | `GroupTask` | Associates the step with `WantedQuestList` to store the player's decision for a group quest. | `GroupTask = 51384` |
+| `KillNPC` | Wait for an observed boss death in the specified Forever dungeon. Requires `npcID`, `name` and `dungeonKey`; see dungeon checkpoints below. | `KillNPC = { npcID = 11520, name = "Taragaman the Hungerer", dungeonKey = "RFC" }` |
 | `LearnProfession` | Checks if a specific profession spell is learned. | `LearnProfession = 2259` |
 | `LearnSkill` | Train spells at a trainer. Waits if unavailable or unaffordable; add the required `MinLevel` and class filters. | `LearnSkill = { spellID = 6673 }, MinLevel = 1` |
-| `LeaveInstance` | Prompts to leave the instance once objectives are done. | `LeaveInstance = { questID = 12345, mapID = 2505 }` |
+| `LeaveInstance` | Prompts to leave the instance once objectives are done. A Forever `dungeonKey` checkpoint completes once the player is outside all instances. | `LeaveInstance = { questID = 12345, mapID = 2505 }` or `{ dungeonKey = "RFC" }` |
 | `LeaveQuest` | Abandons a single quest from the quest log. | `LeaveQuest = 38254` |
 | `LeaveQuests` | Abandons multiple quests from the quest log. | `LeaveQuests = { 38254, 38257 }` |
 | `LeaveScenario` | Prompts to leave the scenario once objectives are done. | `LeaveScenario = { questID = 86912, mapID = 2505 }` |
@@ -119,6 +121,7 @@ An action waits for completion; a failed step condition skips the step. Use one 
 | `LearnSkill`: named spells | `spellID = 6673` or `spellIDs = { 6673, 100 }` supplies localized names; optional `npcID` restricts the trainer. |
 | `LearnSkill`: all services | `LearnSkill = { allAvailable = true, npcID = 911 }`; trainer ID required. Use `text` for advice when no spell IDs are supplied. |
 | `SellItems`, `BankDeposit`, `BankWithdraw`, `DestroyItems` | Process full stacks; pause in combat or on locked slots and leave foreign cursor items alone. |
+| Junk selling | Auto-vendor and `SellItems.junk` use `C_MerchantFrame.SellAllJunkItems()` directly when enabled at the merchant, without the button's confirmation popup. Otherwise sell one stack at a time, retrying after locks or rejected requests. Closing the merchant cancels retries. Explicit item/equipment targets remain required after junk selling. |
 | `TameBeast` fallback | `Text` (or legacy `text`) contains only the beast name; literal names and localization keys are accepted. The cached localized NPC name has priority; target, mouseover, nameplate and name-update events refresh both panels. |
 | Item handling fallback | Cached item names take priority; `text` or `Text` supplies fallback advice. Localization keys and literal text are accepted. |
 | `Repair` threshold | `minDurability` is a percentage from 0 to 100, inclusive. Each durable equipped item is checked; a damaged weapon cannot be hidden by healthy armor. No durable equipment skips the visit; unavailable or restricted durability data keeps it pending. |
@@ -128,6 +131,23 @@ An action waits for completion; a failed step condition skips the step. Use one 
 | `LootItems`, `Collection` | Character-bank counts are saved while the bank is accessible and reused after closing/reloading. Moving items between bags and bank does not increase the combined count. |
 | `Achievement` legacy criterion | `Achievement = { achievementID = 61576, criteriaIndex = 1 }` tracks by position; prefer a stable `criteriaID`. |
 | `LootMoney` | Use it as the main objective. `Money` checks spendable cash; it is not a replacement for this collection objective. |
+
+### Forever dungeon checkpoints
+
+`KillNPC` supports registered bosses in `RFC` (Ragefire Chasm), `ROL` (Ruins of Lordaeron), `WC` (Wailing Caverns), `HOT` (Hall of Thanes) and `DM` (The Deadmines). Dungeon keys resolve to instance IDs, independently of UI map IDs.
+
+Set `Dungeon` on other steps inside the dungeon so boss deaths observed during quest objectives also count toward later checkpoints. Use `InstanceQuest = true, NoArrow = true` for interior steps without verified coordinates; APR navigation then avoids routing to the exterior map.
+
+```lua
+steps = {
+    { EnterInstance = { dungeonKey = "RFC" }, Dungeon = "RFC", InstanceQuest = true },
+    { KillNPC = { npcID = 11520, name = "Taragaman the Hungerer", dungeonKey = "RFC" },
+        Dungeon = "RFC", InstanceQuest = true, NoArrow = true },
+    { LeaveInstance = { dungeonKey = "RFC" }, Dungeon = "RFC", InstanceQuest = true, NoArrow = true },
+}
+```
+
+Only combat-log death events observed in the matching dungeon grant credit. Credit is saved per character and route across UI reloads; resetting the route clears it. Leaving and re-entering at an entry checkpoint starts a fresh run. If the death was not observed, manually skip the checkpoint. Route previews display these steps without creating a run.
 
 ## Navigation and Targeting
 
@@ -140,6 +160,7 @@ An action waits for completion; a failed step condition skips the step. Use one 
 | `ETA` | Estimated AFK timer duration in seconds. | `ETA = 75` |
 | `GossipETA` | Starts an AFK timer after gossip confirmation. | `GossipETA = 45` |
 | `InstanceQuest` | Marks instance steps; delays automatic Delve suggestions. A nearby matching `DoScenario` is replaced by the guide while preserving preceding setup steps. | `InstanceQuest = true` |
+| `Dungeon` | Forever dungeon context for instance detection and boss-death credit during other actions. | `Dungeon = "RFC"` |
 | `IsAdventureMap` | Allows auto-accepting quests from the Adventure Map. | `IsAdventureMap = true` |
 | `Name` | Optional custom name to override the taxi node name. | `Name = "Krasus' Landing"` |
 | `NoArrow` | Hides the navigation arrow for this step. | `NoArrow = true` |
@@ -271,6 +292,11 @@ Conditions on the same table combine with AND. Use `AnyOf` for alternatives, `Al
 | Collection objective vs filter | `LootItems = { { itemID = 2589, quantity = 10 } }` waits for ten cloth; `ItemCount = { itemID = 2589, count = 10 }` skips another action unless ten are already owned. |
 | Primary-profession threshold | `SkipForPrimaryProfessions = 1` skips a reminder once any primary profession is learned; `2` skips only once two are learned. Learning or unlearning refreshes the condition. |
 
+For one reagent per skill point, `LootItems = { { itemID = 769, quantityFromSkill = { skill = "cooking", rank = 50 } } }`
+collects only the amount needed to reach the target skill rank. The current step and preview
+recalculate the target from the live skill; an optional `quantity` caps the collection amount.
+This counts reagents and does not craft items or predict random skill gains.
+
 ### Level requirement forms
 
 | Form | Meaning / supported fields |
@@ -280,6 +306,8 @@ Conditions on the same table combine with AND. Use `AnyOf` for alternatives, `Al
 | `MinLevel = "MidnightDelves"` | Named dynamic threshold from the configured active XP bonuses. |
 | `Grind = { level = 3, xp = 325 }` | Level 3 with at least 325 XP into that level. |
 | `Grind = { level = 4, xp = -700 }` | At most 700 XP remaining before level 4. |
+| `Grind = { level = 60, xp = 0, questLogXP = { 4901, 4508 } }` | Deducts the current rewards of listed, completed quests still in the player's log. Unknown XP, unfinished quests and already rewarded quests give no credit. |
+| `SkipIfCooldown = { { itemID = 6948, operator = ">", seconds = 2, once = true } }` | Skips this step when the item cooldown exceeds the threshold on entry. Use `spellID` for a spell. Omit `once` to monitor continuously, for example `< 300` on a farming/waiting step. |
 | Supported fields | Step `Grind`, `Level`, `MinLevel`, `MaxLevel`, `SkipForLvl`. Route-selection level thresholds remain numeric; `BeLvl` does not accept profiles or absolute XP tables. |
 | Absolute XP validation | Finite integers: `level >= 1`, signed `xp`. Uses the current client's XP range for the relevant level; out-of-range targets clamp to its boundaries. Missing XP data delays completion. |
 

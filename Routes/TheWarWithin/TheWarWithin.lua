@@ -4738,7 +4738,7 @@ APR.RouteQuestStepList["2248-TWW-K'aresh-Storyline"] = {
     steps = {
         {
             PickUp = { 84956 },
-            Coord = { x = -2418.2, y = 2923 },
+            Coord = { x = -2423.3, y = 2923.7 },
             Zone = 2248,
             _index = 1,
         },
@@ -7357,6 +7357,10 @@ APR.RouteQuestStepList["2248-TWW-K'aresh- Visions of a Shadowed Sun - Storyline"
             Coord = { x = -2533.3, y = 2676.4 },
             Zone = 2248,
             _index = 133,
+        },
+        {
+            RouteCompleted = true,
+            _index = 134,
         },
     }
 }

@@ -6,7 +6,11 @@ local frames = {}
 local function noop() end
 function CreateFrame()
     local frame = { scripts = {}, width = 30, height = 24, attributes = { type = "item", item = "item:239142" } }
-    function frame:RegisterEvent(event) self.event = event end
+    function frame:RegisterEvent(event)
+        self.event = event
+        self.events = self.events or {}
+        self.events[event] = true
+    end
 
     function frame:SetScript(event, callback) self.scripts[event] = callback end
 
@@ -143,6 +147,12 @@ assert(deferred.skin == "arrow" and deferred.direction == "down")
 APR:RegisterSkinTarget(CreateFrame(), "borderedPanel")
 local panel = frames[#frames]
 assert(panel.template == "Transparent", "XP overlay and its new header use the provider border")
+local preview = CreateFrame()
+preview.texture = "route illustration"
+preview.StripTextures = function() error("Preview content must survive skinning") end
+APR:RegisterSkinTarget(preview, "panel", { preserveContent = true })
+assert(preview.template == "Transparent" and preview.texture == "route illustration",
+    "Anonymous image panels receive ElvUI borders without stripping their content")
 APR.settings.profile.elvuiSkin = false
 local native = CreateFrame()
 APR:RegisterSkinTarget(native, "button")
@@ -238,9 +248,9 @@ assert(background.shown == false, "Collapsing a window also hides its themed bod
 local settingsButton = CreateFrame()
 APR:RegisterSkinTarget(settingsButton, "settings")
 local settingsIcon = frames[#frames]
-assert(settingsIcon.texture == "Interface\\AddOns\\EllesmereUIDamageMeters\\Media\\dm_settings.png"
+assert(settingsIcon.texture == "Interface\\Buttons\\UI-OptionsButton"
     and settingsIcon.color[2] == 0.8 and settingsIcon.color[4] == 0.4,
-    "Current Step reuses the Damage Meter settings icon and tint")
+    "Settings use native artwork with the EUI tint, without an optional module")
 local header = CreateFrame()
 header.Text = CreateFrame()
 APR:RegisterSkinTarget(header, "header")
@@ -265,7 +275,7 @@ assert(not deferredEUI.skin)
 combat = false
 events.scripts.OnEvent()
 for _, frame in ipairs(frames) do
-    if frame.event == "PLAYER_REGEN_ENABLED" and frame ~= events then frame.scripts.OnEvent() end
+    if frame.events and frame.events.PLAYER_REGEN_ENABLED and frame ~= events then frame.scripts.OnEvent() end
 end
 assert(refreshes == beforeRefresh + 2)
 assert(deferredEUI.skinned.EditBox and deferredEUI.skinned.Font)
@@ -284,7 +294,12 @@ print("PASS: EllesmereUI public API, optional/old clients, late controls, provid
 
 -- Exercise the real text registry: later layout updates must not undo the skin.
 local media = { GetDefault = function() return "Native" end, Fetch = function() return "native.ttf" end }
-function LibStub() return media end
+local locale = {}
+function LibStub(name)
+    if name == "AceLocale-3.0" then return {GetLocale = function() return locale end} end
+    return media
+end
+dofile("tests/lua/localization_test_env.lua")
 
 function APR:ResolveUIFileAsset(path) return path end
 
@@ -336,3 +351,68 @@ for _, frame in ipairs(frames) do
 end
 assert(themedBar.color[1] == 0.8 and themedBar.color[4] == 0.2)
 print("PASS: EllesmereUI bar textures preserve APR options, Love fill colors, alpha and combat-safe recoloring")
+
+-- The real adapters may coexist: selecting EUI for the guide must not recolor ElvUI elsewhere.
+APR.QuestTracker = {
+    GetAppearanceProvider = function(_, scope)
+        return scope == "currentStep" and APR.settings.profile.currentStepTrackerAppearance or nil
+    end,
+    Style = function() end,
+}
+APR.settings.profile.currentStepAttachFrameToQuestLog = true
+APR.settings.profile.currentStepTrackerAppearance = "EllesmereUI"
+APR.settings.profile.elvuiSkin, APR.settings.profile.ellesmereuiSkin = true, false
+ElvUI = {{GetModule = function() return S end}}
+CurrentStepScreenPanel = CreateFrame()
+local guideButton, globalButton = CreateFrame(), CreateFrame()
+function guideButton:GetParent() return CurrentStepScreenPanel end
+dofile("APR-Core/integrations/SkinRegistry.lua")
+dofile("APR-Core/integrations/ElvUISkin.lua")
+APR.ElvUISkin:OnEnable()
+APR:RegisterSkinTarget(guideButton, "button")
+APR:RegisterSkinTarget(globalButton, "button")
+assert(globalButton.skin == "button" and not guideButton.skin)
+callback(eui)
+assert(guideButton.skin == "Button" and globalButton.skin == "button")
+assert(APR.EllesmereUISkin:GetFont("currentStep") == "EUI-font.ttf"
+    and APR.EllesmereUISkin:GetFont("party") == nil and APR.EllesmereUISkin:GetTextColor("accent", "party") == nil,
+    "An EUI guide override cannot leak into the other provider's fonts or colors")
+local guideFont = CreateFrame()
+function guideFont:SetFont(path, size, flags) self.font = path; return true end
+APR:RegisterFontString(guideFont, "currentStep", {role = "base"})
+assert(guideFont.font == "EUI-font.ttf" and guideFont.color[1] == 0.72)
+assert(not APR.EllesmereUISkin:ApplyBarFill(CreateFrame(), "party"),
+    "Scope-specific EUI skinning cannot change an ElvUI status bar")
+local applied = calls.Button
+APR:RefreshRegisteredSkins()
+assert(calls.Button == applied, "Both adapters remain idempotent when registered together")
+print("PASS: real ElvUI/EllesmereUI coexistence, explicit tracker override, isolated fonts/colors and bars")
+
+APR.settings.profile.elvuiSkin, APR.settings.profile.ellesmereuiSkin = false, true
+APR.settings.profile.currentStepTrackerAppearance = "ElvUI"
+dofile("APR-Core/integrations/SkinRegistry.lua")
+dofile("APR-Core/integrations/EllesmereUISkin.lua")
+local elvGuide, euiGlobal = CreateFrame(), CreateFrame()
+function elvGuide:GetParent() return CurrentStepScreenPanel end
+APR.ElvUISkin:OnEnable()
+callback(eui)
+APR:RegisterSkinTarget(elvGuide, "button")
+APR:RegisterSkinTarget(euiGlobal, "button")
+assert(elvGuide.skin == "button" and euiGlobal.skin == "Button")
+assert(APR.EllesmereUISkin:GetFont("currentStep") == nil and APR.EllesmereUISkin:GetFont("party") == "EUI-font.ttf")
+print("PASS: reverse provider choice, ElvUI guide with EllesmereUI elsewhere")
+
+-- Real EUI header accents must not erase APR text preferences during a live looks refresh.
+dofile("APR-Core/utils/TextStyleUtils.lua")
+APR.settings.profile.globalTextAppearance = APR:CreateTextAppearanceDefaults(false)
+local customHeader = CreateFrame()
+customHeader.Text = CreateFrame()
+function customHeader.Text:SetFont(path) self.font = path; return true end
+APR:RegisterFontString(customHeader.Text, "party", {role = "accent"})
+APR:RegisterSkinTarget(customHeader, "header", {scope = "party"})
+APR.TextStyleUtils:SetAppearanceValue("globalTextAppearance", "accentColor", {0.4, 0.2, 0.9, 0.6}, "general")
+assert(customHeader.Text.color[1] == 0.4 and customHeader.Text.color[4] == 0.6)
+looksChanged()
+assert(customHeader.Text.color[1] == 0.4 and customHeader.Text.color[4] == 0.6
+    and customHeader.Text.font == "EUI-font.ttf", "EUI keeps APR's explicit text color and its integrated font")
+print("PASS: real Ellesmere header accent refresh preserves explicit APR text RGBA")

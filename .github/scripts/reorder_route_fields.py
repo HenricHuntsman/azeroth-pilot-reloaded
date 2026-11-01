@@ -200,7 +200,8 @@ class LuaSource:
         body_start = self.tokens[opening].end()
         return body_start, closing, "".join(chunks[key] for key in ordered) + self.text[start:closing]
 
-    def step_tables(self):
+    def step_sequences(self):
+        """Yield independent main and parallel step sequences for each route."""
         def value_table(fields, name):
             return next((value for key, _, value, _ in fields
                          if key == name and self.tokens[value][0] == "{"), None)
@@ -219,16 +220,39 @@ class LuaSource:
             route_fields = self.fields(assignment + 1)
             main = value_table(route_fields, "steps")
             if main is not None:
-                yield from steps(main)
+                yield list(steps(main))
             parallel = value_table(route_fields, "parallelSteps")
             if parallel is not None:
+                parallel_tables = []
                 for group in steps(parallel):
                     group_steps = value_table(self.fields(group), "steps")
                     if group_steps is not None:
-                        yield from steps(group_steps)
+                        parallel_tables.extend(steps(group_steps))
+                yield parallel_tables
+
+    def step_tables(self):
+        for sequence in self.step_sequences():
+            yield from sequence
 
 
 def normalize_text(text: str) -> str:
+    # Canonicalize literal coordinate pairs before moving their containing step.
+    # Inspect parsed fields so quoted notes/comments cannot be rewritten.
+    source = LuaSource(text)
+    coordinates = []
+    number = r"-?(?:\d+(?:\.\d*)?|\.\d+)"
+    for table in source.step_tables():
+        for key, _, value, _ in source.fields(table):
+            if key != "Coord" or source.tokens[value][0] != "{":
+                continue
+            start = source.tokens[value].start()
+            end = source.tokens[source.pairs[value]].end()
+            literal = text[start:end]
+            match = re.fullmatch(r"\{\s*y\s*=\s*(" + number + r"),\s*x\s*=\s*(" + number + r")\s*\}", literal)
+            if match:
+                coordinates.append((start, end, "{ x = " + match[2] + ", y = " + match[1] + " }"))
+    for start, end, replacement in sorted(coordinates, reverse=True):
+        text = text[:start] + replacement + text[end:]
     source = LuaSource(text)
     actions = action_keys()
     replacements = [replacement for table in source.step_tables()

@@ -23,6 +23,7 @@ CurrentStepScreenPanel:SetSize(420, stepHeight)
 CurrentStepScreenPanel:SetScale(1.25)
 
 dofile("APR-Core/ui/route/FillersFrame.lua")
+dofile("APR-Core/ui/foundations/VirtualList.lua")
 dofile("APR-Core/ui/route/QuestOrderList.lua")
 dofile("APR-Core/features/player/AFK.lua")
 -- Load the shared anchor selection and positioning functions after mock widgets
@@ -50,6 +51,15 @@ local function startRealTimer()
 end
 
 -- The quest list must move even when there are no visible fillers.
+assertListAnchor(CurrentStepScreenPanel, stepHeight)
+-- A saved-position restore can leave cached dimensions unchanged but overwrite the point.
+QuestOrderListPanel:ClearAllPoints()
+QuestOrderListPanel:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+APR.questOrderList:ApplySnapAnchor()
+assertListAnchor(CurrentStepScreenPanel, stepHeight)
+QuestOrderListPanel:ClearAllPoints()
+QuestOrderListPanel:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+QuestOrderListPanel.scripts.OnShow(QuestOrderListPanel)
 assertListAnchor(CurrentStepScreenPanel, stepHeight)
 startRealTimer()
 assertListAnchor(AfkFrameScreen, 20)

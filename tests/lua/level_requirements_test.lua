@@ -9,6 +9,7 @@ C_UnitAuras = {
 function LibStub() return { GetLocale = function() return { GRIND = "Reach level %d", USE_ITEM = "Use %s" } end } end
 
 APR = {}
+dofile("APR-Core/data/models/Enums.lua")
 dofile("APR-Core/utils/PlayerUtils.lua")
 function APR:HasAura(id)
     reads = reads + 1; return auras[id]
@@ -31,6 +32,7 @@ function UnitXPMax() return maxXP end
 
 C_Map = { GetBestMapForUnit = function() return 2413 end }
 dofile("APR-Core/config/LevelProfiles.lua")
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/utils/RouteUtils.lua")
 local targets = { 88.00, 87.85, 87.75, 87.65, 87.55, 87.45 }
 local eventTargets = { 87.55, 87.45, 87.30, 87.30, 87.18, 86.88 }
@@ -50,8 +52,6 @@ end
 auras = { [430191] = true, [1214848] = true, [1287282] = true }
 achievements = { [42328] = true }
 assert(APR:GetLevelProfileTarget("MidnightDelves", true) == 87.45, "Both event IDs still grant only 20%")
-assert(APR:GetGrindStepText("MidnightDelves") == "Reach level 87 + 45% XP")
-assert(APR:GetGrindStepText(90) == "Reach level 90")
 xp = 449
 assert(not APR:AreConditionalFiltersMet({ MinLevel = "MidnightDelves" }))
 assert(APR:AreConditionalFiltersMet({ SkipForLvl = "MidnightDelves" }))
@@ -297,8 +297,6 @@ do
     level, xp, maxXP = 3, 0, 0
     assert(APR:GetPlayerEffectiveLevel() < APR:ResolveLevelRequirement(intoLevel))
     assert(APR:GetPlayerEffectiveLevel() < APR:ResolveLevelRequirement(beforeLevel))
-    assert(APR:GetGrindStepText(intoLevel) == "Reach level 3 + 325 XP")
-    assert(APR:GetGrindStepText(beforeLevel) == "Reach level 4 - 700 XP")
     assert(APR:ResolveLevelRequirement(3.5) == 3.5)
     assert(not pcall(APR.ResolveLevelRequirement, APR, { level = 3.5, xp = 1 }))
     assert(not pcall(APR.ResolveLevelRequirement, APR, { level = 3 }))

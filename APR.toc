@@ -11,7 +11,7 @@
 ## OptionalDeps: LibTaxiData, ElvUI, EllesmereUI
 
 ## SavedVariables: APRSettings, APRData, APRCustomPath, APRZoneCompleted, APRTaxiNodes, APRTaxiNodesTimer, APRScenarioCompleted, APRScenarioMapIDCompleted, APRItemLooted, APRGossipValidated
-## SavedVariablesPerCharacter: FarstriderLibData_CharacterSettings
+## SavedVariablesPerCharacter: APRNavigationCharacterSettings
 
 ## Category-enUS: Quests
 ## Category-deDE: Quests
@@ -33,63 +33,104 @@
 ## X-Wago-ID: XKq9xXKy
 
 APR-Core/libs/embeds.xml
-APR-Core/libs/FarstriderLibData_[Game].xml
+APR-Core/libs/LibAPRNavigation-1.0/LibAPRNavigation.xml
 APR-Core/locales/locales.xml
 
+APR-Core/core/Diagnostics.lua
+APR-Core/core/DiagnosticManifest.lua
 APR-Core/utils/SecretUtils.lua
 APR-Core/core/Core.lua
+APR-Core/core/ErrorLog.lua
+APR-Core/ui/foundations/ReloadConfirmation.lua
 APR-Core/integrations/SkinRegistry.lua
-APR-Core/integrations/TaxiData.lua
+APR-Core/features/navigation/NavigationTaxi.lua
+
+APR-Core/data/models/Items.lua
+APR-Core/data/Dungeons/DungeonsClassic.lua
+APR-Core/data/Dungeons/DungeonsForever.lua
+APR-Core/data/Dungeons/DungeonsRetail.lua
 
 APR-Core/utils/Utils.lua
 APR-Core/utils/PlayerUtils.lua
 APR-Core/utils/ProfileUtils.lua
+APR-Core/ui/foundations/Themes.lua
 APR-Core/ui/foundations/TextStyles.lua
 APR-Core/ui/foundations/StatusBars.lua
+APR-Core/ui/foundations/Widgets.lua
+APR-Core/integrations/Gamepad.lua
+APR-Core/integrations/GamepadNavigation.lua
+APR-Core/integrations/GamepadControls.lua
+APR-Core/ui/foundations/ThemeCustomization.lua
+APR-Core/ui/foundations/TimeSeriesGraph.lua
+APR-Core/ui/foundations/VirtualList.lua
+APR-Core/ui/foundations/SelectionDialog.lua
+APR-Core/ui/foundations/SettingsRows.lua
+APR-Core/ui/foundations/SettingsWidgets.lua
+APR-Core/ui/panels/LayoutEditor.lua
 APR-Core/utils/TextStyleUtils.lua
 APR-Core/utils/TargetUtils.lua
 APR-Core/utils/QuestUtils.lua
 APR-Core/utils/InstanceUtils.lua
-APR-Core/utils/DelveRouteUtils.lua
+APR-Core/utils/DungeonUtils.lua
+APR-Core/utils/OutdoorKillUtils.lua
+APR-Core/features/questing/DelveRoutes.lua
 APR-Core/config/LevelProfiles.lua
 APR-Core/utils/RouteUtils.lua
 APR-Core/utils/RouteConditions.lua
-APR-Core/utils/RouteManager.lua
+APR-Core/features/questing/RouteManager.lua
+APR-Core/features/questing/RouteCatalog.lua
 APR-Core/utils/SojournerUtils.lua
-APR-Core/utils/RouteTriggersSuggestion.lua
+APR-Core/features/questing/RouteSuggestions.lua
 APR-Core/utils/NavigationUtils.lua
 APR-Core/utils/UIUtils.lua
+APR-Core/integrations/QuestTracker.lua
 APR-Core/utils/BuyMerchantUtils.lua
 APR-Core/utils/LootUtils.lua
 APR-Core/utils/PlayerPositionUtils.lua
-APR-Core/utils/ZoneDetectionUtils.lua
-APR-Core/utils/SceneCutterUtils.lua
-APR-Core/utils/CoordinateFrame.lua
+APR-Core/features/navigation/NavigationAdapter.lua
+APR-Core/integrations/NavigationEntrances.lua
+APR-Core/utils/NavigationZones.lua
+APR-Core/features/player/Cutscenes.lua
+APR-Core/ui/panels/Coordinates.lua
 APR-Core/utils/RouteHashUtils.lua
+APR-Core/features/questing/StepTransitions.lua
 APR-Core/utils/StepUtils.lua
-APR-Core/utils/QuestOrderListUtils.lua
+APR-Core/ui/route/QuestOrderListSupport.lua
 
 APR-Core/data/models/Classes.lua
 APR-Core/data/models/Enums.lua
 APR-Core/data/models/Quest.lua
-APR-Core/data/models/Spells.lua
 
-APR-Core/data/zones/ScenarioEntrances.lua
 
+APR-Core/config/AboutData.lua
 APR-Core/config/Config.lua
+APR-Core/config/WorkspaceOptions.lua
 APR-Core/config/Config_Route.lua
 APR-Core/config/Config_Route_Prefabs.lua
 APR-Core/features/navigation/WorldCoordinateConverter.lua
 APR-Core/core/Commands.lua
+APR-Core/core/Performance.lua
+APR-Core/core/PerformanceScopes.lua
+APR-Core/core/DiagnosticReport.lua
+APR-Core/core/ResourceMonitor.lua
 APR-Core/ui/panels/ChangeLog.lua
 APR-Core/core/VersionCheck.lua
 
 APR-Core/core/Event.lua
+APR-Core/features/questing/NPCInteraction.lua
 
+APR-Core/features/questing/StepInstructions.lua
+APR-Core/features/questing/StepQuestHandlers.lua
+APR-Core/features/questing/StepTravelHandlers.lua
+APR-Core/features/questing/StepActionHandlers.lua
+APR-Core/features/questing/StepRenderer.lua
+APR-Core/features/questing/QuestCache.lua
 APR-Core/features/questing/QuestHandler.lua
 APR-Core/features/questing/RouteActions.lua
-APR-Core/integrations/Farstrider.lua
-APR-Core/integrations/ForeverTravel.lua
+APR-Core/features/navigation/Preview.lua
+APR-Core/features/navigation/NavigationPlanner.lua
+APR-Core/features/navigation/NavigationUnlocks.lua
+APR-Core/features/navigation/Navigation.lua
 APR-Core/features/navigation/FlightPath.lua
 
 APR-Core/features/navigation/Arrow.lua
@@ -101,14 +142,25 @@ APR-Core/ui/route/QuestionPopUp.lua
 APR-Core/ui/route/QuestOrderList.lua
 APR-Core/ui/route/QuestOrderListRows.lua
 APR-Core/features/questing/Gossip.lua
+APR-Core/features/group/PartyProtocol.lua
 APR-Core/features/group/Party.lua
 APR-Core/features/navigation/Map.lua
 APR-Core/features/player/AFK.lua
 APR-Core/features/player/Heirloom.lua
 APR-Core/ui/route/RouteSelection.lua
+APR-Core/ui/route/RouteBrowserRows.lua
+APR-Core/ui/route/RouteBrowser.lua
 APR-Core/features/player/Buff.lua
 APR-Core/features/player/XPBuffOverlay.lua
 APR-Core/ui/panels/StatusReport.lua
+APR-Core/ui/panels/PerformanceResources.lua
+APR-Core/ui/panels/PerformanceDashboard.lua
+APR-Core/ui/panels/ReleaseNotesPanel.lua
+APR-Core/ui/panels/ReleaseNotesWindow.lua
+APR-Core/ui/panels/OptionsPanel.lua
+APR-Core/ui/panels/AboutPanel.lua
+APR-Core/ui/panels/Workspace.lua
+APR-Core/ui/panels/AppearanceIntro.lua
 APR-Core/integrations/ElvUISkin.lua
 APR-Core/integrations/EllesmereUISettings.lua
 APR-Core/integrations/EllesmereUISkin.lua
