@@ -1312,8 +1312,8 @@ function nav:Publish(result, context, generation)
     self.search, self._searchTimer = nil, nil
     self._directBaselinePending = nil
     result = result or {}
-    local service = APR.Services and APR.Services:GetStep()
-    local servicePolicyValid = not service or APR.NavigationData:IsServiceItineraryAllowed(self.queue, self.cursor, result)
+    local retainedService = APR.Services and APR.Services:GetStep()
+    local servicePolicyValid = not retainedService or APR.NavigationData:IsServiceItineraryAllowed(self.queue, self.cursor, result)
     if self.recomputeKeepingPath and self:IsItineraryValid() and servicePolicyValid then
         if not Position() then
             self.recomputeKeepingPath = nil
