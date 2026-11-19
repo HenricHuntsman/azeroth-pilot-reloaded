@@ -2,16 +2,16 @@
 
 <p align="center">
   <a href="https://www.curseforge.com/wow/addons/azeroth-pilot-reloaded">
-    <img src="readme/assets/banner-rounded.svg" alt="Azeroth Pilot Reloaded" width="1000">
+    <img src="readme/assets/banner-rounded.svg" alt="Azeroth Pilot Reloaded — World of Warcraft leveling guide addon" width="1000">
   </a>
 </p>
 
-<h1 align="center">Your adventure. A clear path.</h1>
+<h1 align="center">Azeroth Pilot Reloaded — Leveling Guide for World of Warcraft</h1>
 
 <p align="center">
-  A quest routing and leveling addon for <strong>World of Warcraft</strong>.<br>
-  Follow the arrow, complete each objective, and shape the journey around your character.<br>
-  The continuation, optimization, and rewrite of <strong>Azeroth Auto Pilot</strong>.
+  <strong>Azeroth Pilot Reloaded (APR)</strong> is a free, open-source WoW leveling addon with in-game, step-by-step quest guides.<br>
+  Follow the waypoint arrow, track quest objectives, and choose leveling, speedrun, or campaign routes for your character.<br>
+  The continuation, optimization, and rewrite of <strong>Azeroth Auto Pilot (AAP)</strong>. Your adventure. A clear path.
 </p>
 
 <p align="center">
@@ -51,6 +51,7 @@
       <h3>02 &nbsp; Choose your route</h3>
       <p>Type <code>/apr route</code>. Search compatible routes by expansion and category, select a route, or build an ordered custom path.</p>
       <p>Use the <strong>Leveling</strong>, <strong>Speedrun</strong>, or <strong>All Quests</strong> presets to get started.</p>
+      <p>Route level limits above 10 are recommendations: routes outside your level range appear in yellow, and a warning asks you to confirm before adding one to your path. All conditions within the route's steps and starting-level limits still apply.</p>
     </td>
   </tr>
   <tr>
@@ -66,6 +67,14 @@
     </td>
   </tr>
 </table>
+
+### Controller support (WoW Forever)
+
+Enable WoW Forever's native gamepad interface, then assign **APR → Gamepad menu** in WoW's key bindings. Alternatively, open the **Gamepad menu** button at the top of the APR window (or `/apr gamepad`), choose **Key Bindings**, and press your controller button or modifier combination. APR asks before replacing an existing binding. Combinations of ordinary controller buttons, such as RB + D-pad Up, are saved as APR menu shortcuts: hold the buttons together, then release them all to confirm the capture. These shortcuts also open the menu on release, outside combat; the buttons keep their normal game actions. Routes, options, skip, rollback and current-step controls also have individual bindings.
+
+APR windows use Forever's native focus, confirmation, Back and right-stick scrolling. Left/right follows adjacent route buttons. Confirm or secondary click enters a settings category or tab; Back returns to its heading. Route lists remain navigable beyond the visible rows; slider settings use left/right to adjust and up/down to leave. Colours, panel placement and image zoom/pan have controller controls. **Use quest item** activates an available step action through a secure button.
+
+See [controller controls and in-game checks](docs/gamepad.md) for setup, combat behavior and verification limits.
 
 > [!TIP]
 > **Take control of an interaction.** Hold <kbd>Ctrl</kbd>, <kbd>Shift</kbd>, or <kbd>Alt</kbd> when interacting with an NPC, flight master, or merchant to bypass the corresponding interaction automation. These modifiers also bypass cutscene skipping. Item and spell buttons require your click or key press.
@@ -109,6 +118,7 @@
       <ul>
         <li><strong>Quest item and spell buttons</strong>, target helpers, and a key binding for the APR item button.</li>
         <li><strong>Automatic reward selection</strong> with ordered priorities: item level, cosmetics, uncollected transmogs, and vendor price. Control multiple cosmetic or transmog choices separately.</li>
+        <li><strong>Bag upgrade suggestions</strong> compare your items with equipped gear using your selected APR or Pawn weights. Confirm each equipment change outside combat; use <code>/apr gear</code> to check again, or disable suggestions in the reward options.</li>
         <li><strong>Sell poor-quality items</strong> and repair equipment automatically when enabled; repairs use eligible guild funds before personal gold.</li>
         <li><strong>Route-directed actions</strong> for purchases, selected item sales, equipment, banking, training, and more, with progress tracking.</li>
       </ul>
@@ -240,7 +250,7 @@ Type **`/apr`** to open settings or use APR's minimap launcher. All commands use
 | Command            | Aliases                        | What it does                                                                                                                                                                        |
 | ------------------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/apr skip`        | `/apr s`, `/apr skippiedoodaa` | Skip the current step and refresh navigation.                                                                                                                                       |
-| `/apr rollback`    | `/apr rb`                      | Go back one step and refresh navigation.                                                                                                                                            |
+| `/apr rollback`    | `/apr rb`                      | Return to the last unfinished visible step and refresh navigation.                                                                                                                                            |
 | `/apr reset`       | `/apr r`                       | Restart the active route from step 1; clear its skipped-step and parallel-step state.                                                                                               |
 | `/apr resetcustom` | —                              | Delete all saved imported custom routes, then reload the UI.                                                                                                                        |
 | `/apr forcereset`  | `/apr fr`                      | Clear the current character's APR route progress, completed-zone records, and custom path, then reload the UI. Settings profiles and saved imported route definitions are retained. |

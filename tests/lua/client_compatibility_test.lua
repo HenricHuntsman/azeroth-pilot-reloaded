@@ -1,6 +1,10 @@
 -- Client filtering is hard visibility, regardless of otherwise valid level conditions.
 local L = setmetatable({}, { __index = function(_, key) return key end })
-function LibStub() return { GetLocale = function() return L end } end
+function LibStub()
+    return { GetLocale = function() return L end }
+end
+UNAVAILABLE = "Unavailable"
+DUNGEONS = "Dungeons"
 
 APR = { RouteQuestStepList = {}, interfaceVersion = 16001, Faction = "Horde" }
 function APR:NewModule() return {} end
@@ -10,7 +14,9 @@ function APR:IsDelveRoute() return false end
 function UnitLevel() return 12 end
 
 function tContains(values, value)
-    for _, entry in ipairs(values) do if entry == value then return true end end
+    for _, entry in ipairs(values) do
+        if entry == value then return true end
+    end
     return false
 end
 
@@ -18,8 +24,10 @@ C_Map = { GetBestMapForUnit = function() return 1411 end }
 dofile("APR-Core/utils/PlayerUtils.lua")
 dofile("APR-Core/data/models/Enums.lua")
 dofile("APR-Core/data/models/Classes.lua")
+dofile("APR-Core/utils/Utils.lua")
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/utils/RouteUtils.lua")
-dofile("APR-Core/utils/RouteManager.lua")
+dofile("APR-Core/features/questing/RouteManager.lua")
 
 -- GetBuildInfo returns fields after the interface number as well. The fallback
 -- must pass only that number to tonumber, including during file loading.
@@ -44,12 +52,12 @@ APR.RouteQuestStepList.shared = { label = "Shared", expansion = APR.EXPANSIONS.C
 APR.RouteQuestStepList.versioned = {
     label = "Versioned",
     expansion = APR.EXPANSIONS.Vanilla,
-    conditions = { Level = 10, InterfaceVersion = 120100 }
+    conditions = { Level = 10, InterfaceVersion = 120100 },
 }
 APR.RouteQuestStepList.exactVersioned = {
     label = "Exact versioned",
     expansion = APR.EXPANSIONS.Vanilla,
-    conditions = { Level = 10, InterfaceVersionExact = 120105 }
+    conditions = { Level = 10, InterfaceVersionExact = 120105 },
 }
 assert(APR:GetGameVersion() == "forever")
 local tabs = APR:GetRouteSelectionExpansions()
@@ -61,11 +69,14 @@ assert(APR:GetRouteVisibility("shared") == "visible")
 assert(APR:GetRouteData("retail") == nil)
 assert(not APR:IsRequiredRouteApplicable("retail"))
 APR.RouteQuestStepList.forever.conditions.Level = 20
-assert(APR:GetRouteVisibility("forever") == "disabled", "Compatible routes still obey soft level locks")
+assert(APR:GetRouteVisibility("forever") == "visible", "Compatible routes above level 10 remain selectable")
+assert(#APR:GetRouteLevelWarnings("forever") == 1, "An unmet recommended level produces a warning")
 APR.interfaceVersion = 120105
 tabs = APR:GetRouteSelectionExpansions()
 assert(#tabs == #APR.EXPANSION_ORDER_KEYS - 1)
-for _, tab in ipairs(tabs) do assert(tab ~= APR.EXPANSIONS.Forever) end
+for _, tab in ipairs(tabs) do
+    assert(tab ~= APR.EXPANSIONS.Forever)
+end
 assert(APR:GetRouteVisibility("retail") == "visible")
 assert(APR:GetRouteVisibility("forever") == "hidden", "Client mismatch must not become a level lock")
 assert(APR:GetRouteVisibility("saved") == "visible")
@@ -92,7 +103,11 @@ GetMaxLevelForPlayerExpansion = function() return 70 end
 assert(APR:GetPlayerMaxLevel() == 70)
 C_PetBattles = { IsInBattle = function() return true end }
 assert(APR:IsPetBattleActive())
-C_UnitAuras = { GetPlayerAuraBySpellID = function(id) if id == 1232454 then return {} end end }
+C_UnitAuras = {
+    GetPlayerAuraBySpellID = function(id)
+        if id == 1232454 then return {} end
+    end,
+}
 assert(APR:IsRemixCharacter())
 
 -- Saved route client metadata survives the existing import path.
@@ -100,20 +115,26 @@ APRData = { CustomRoute = { Imported = { label = "Imported", gameVersion = "fore
 APR:LoadCustomRoutes()
 assert(APR.RouteQuestStepList.Imported.gameVersion == "forever")
 
--- Popup options must omit incompatible expansions, including unavailable placeholders.
+-- Prefab choices contain real compatible routes, and a single choice applies directly.
 APR.routeconfig = {}
 APR.Level = 12
+APR.PlayerID, APRData.player, APRCustomPath = "player", {}, { player = {} }
+function APR:GetPlayerParentMapID() return nil end
 tinsert = table.insert
+APR.RouteQuestStepList.forever.conditions.Level = 10
+APR.RouteQuestStepList.forever.prefab = { leveling = 1 }
+APR.RouteQuestStepList.retail.expansion = APR.EXPANSIONS.TheBurningCrusade
+APR.RouteQuestStepList.retail.prefab = { leveling = 1 }
 dofile("APR-Core/config/Config_Route_Prefabs.lua")
-local popupOptions
-APR.questionDialog = { CreateSelectionPopup = function(_, _, _, options) popupOptions = options end }
+local selected
+function APR.routeconfig:BuildLevelingPrefab(expansion) selected = expansion end
+APR.questionDialog = { CreateSelectionPopup = function() error("One choice should apply directly") end }
 APR.routeconfig:OpenLevelingPopup()
-assert(#popupOptions == 1 and popupOptions[1].key == APR.EXPANSIONS.Forever)
+assert(selected == APR.EXPANSIONS.Forever)
 APR.routeconfig:GetPlayerSpecRoute("Starter") -- no specialization API on Forever
 APR.interfaceVersion = 120105
 APR.routeconfig:OpenLevelingPopup()
-assert(#popupOptions > 1)
-for _, option in ipairs(popupOptions) do assert(option.key ~= APR.EXPANSIONS.Forever) end
+assert(selected == APR.EXPANSIONS.TheBurningCrusade)
 APR.interfaceVersion = 16001
 
 -- Unknown events never prevent shared quest events from registering.
@@ -130,10 +151,11 @@ end
 
 C_EventUtils = { IsEventValid = function(event) return event ~= "ACTIVE_DELVE_DATA_UPDATE" end }
 dofile("APR-Core/core/Event.lua")
-APR.event:MyRegisterEvent()
+dofile("APR-Core/features/questing/NPCInteraction.lua")
+APR.event:RegisterEvents()
 assert(registered.QUEST_ACCEPTED and registered.QUEST_LOG_UPDATE)
 assert(not registered.ACTIVE_DELVE_DATA_UPDATE)
 C_EventUtils = nil
-APR.event:MyRegisterEvent()
+APR.event:RegisterEvents()
 assert(registered.HEARTHSTONE_BOUND)
 print("Client compatibility: visibility, saved routes, API fallbacks and event registration passed")

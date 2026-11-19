@@ -20,6 +20,27 @@ sys.path.pop(0)
 
 
 class RouteFieldOrderTests(unittest.TestCase):
+    def test_coordinate_xy_order_preserves_values_and_note_text(self):
+        text = '''APR.RouteQuestStepList["Test"] = {
+    steps = {
+        {
+            BuyMerchant = { { itemID = 1, quantity = 1 } },
+            Note = { "Coord = { y = 2, x = 1 }" },
+            Coord = { y = 2368.97, x = -1187.95 },
+            Range = 5,
+            Zone = 1420,
+            _index = 1,
+        },
+    },
+}
+'''
+        result = reorder.normalize_text(text)
+        self.assertIn('Coord = { x = -1187.95, y = 2368.97 }', result)
+        self.assertIn('Note = { "Coord = { y = 2, x = 1 }" }', result)
+        self.assertIn('Zone = 1420', result)
+        self.assertIn('Range = 5', result)
+        self.assertEqual(reorder.normalize_text(result), result)
+
     def test_recorder_field_groups_and_natural_text_order(self):
         fields = dict.fromkeys((
             "_index", "Zone", "Class", "FutureData", "NoArrow", "SpellButton", "Button",
@@ -91,7 +112,7 @@ APR.RouteQuestStepList["test"] = {
         result = reorder.normalize_text(source)
         self.assertIn('conditions = { Zone = 1, Class = "MAGE" }', result)
         self.assertIn('conditions = { Zone = 2, Class = "WARLOCK" }', result)
-        self.assertIn('steps = { { LearnSkill = {}, Coord = { y = 2, x = 1 }, Zone = 1, } }', result)
+        self.assertIn('steps = { { LearnSkill = {}, Coord = { x = 1, y = 2 }, Zone = 1, } }', result)
         self.assertIn('steps = { { BuyMerchant = {}, Coord = {}, Zone = 2, } }', result)
         self.assertEqual(source.split("\n")[:2], result.split("\n")[:2])
 
@@ -155,8 +176,6 @@ class RouteHookTests(unittest.TestCase):
         self.git("config", "core.autocrlf", "false")
         self.git("config", "commit.gpgsign", "false")
         self.git("config", "core.hooksPath", ".githooks")
-        shutil.copytree(ROOT / ".githooks", self.root / ".githooks")
-        (self.root / ".githooks/pre-commit").chmod(0o755)
         (self.root / ".github/scripts").mkdir(parents=True)
         for name in ("fix_route_indexes.py", "reorder_route_fields.py"):
             shutil.copyfile(ROOT / ".github/scripts" / name, self.root / ".github/scripts" / name)
@@ -175,14 +194,50 @@ class RouteHookTests(unittest.TestCase):
 '''
         self.path.write_text(self.original, encoding="utf-8", newline="")
         self.git("add", "--", "Routes/route with spaces.lua")
+        # Seed an unformatted index before enabling either normalization hook.
+        shutil.copytree(ROOT / ".githooks", self.root / ".githooks")
+        for name in ("pre-commit", "post-index-change"):
+            (self.root / ".githooks" / name).chmod(0o755)
 
-    def git(self, *args):
+    def git(self, *args, input=None):
         environment = os.environ.copy()
         environment["PATH"] = str(Path(sys.executable).parent) + os.pathsep + environment["PATH"]
-        return subprocess.check_output(["git", *args], cwd=self.root, env=environment, stderr=subprocess.STDOUT)
+        return subprocess.check_output(["git", *args], cwd=self.root, env=environment,
+                                       input=input, stderr=subprocess.STDOUT, timeout=20)
 
     def expected(self):
         return reorder.normalize_text(indexes.normalize_text(self.original)).encode("utf-8")
+
+    def test_add_formats_staged_route_and_matching_working_copy(self):
+        self.git("add", "--", "Routes/route with spaces.lua")
+        self.assertEqual(self.git("show", ":Routes/route with spaces.lua"), self.expected())
+        self.assertEqual(self.path.read_bytes(), self.expected())
+        self.assertEqual(self.git("diff", "--", "Routes"), b"")
+
+    def test_add_numbers_parallel_steps_independently(self):
+        source = '''APR.RouteQuestStepList["test"] = {
+    parallelSteps = {
+        { steps = { { Note = "parallel one", _index = 8 } } },
+        { steps = { { Note = "parallel two", _index = 9 } } },
+    },
+    steps = { { Note = "main one", _index = 10 }, { Note = "main two", _index = 11 } },
+}
+'''
+        expected = source.replace('_index = 8', '_index = 1').replace(
+            '_index = 9', '_index = 2').replace('_index = 10', '_index = 1').replace(
+            '_index = 11', '_index = 2').encode("utf-8")
+        self.path.write_text(source, encoding="utf-8", newline="")
+        self.git("add", "--", "Routes/route with spaces.lua")
+        self.assertEqual(self.git("show", ":Routes/route with spaces.lua"), expected)
+        self.assertEqual(self.path.read_bytes(), expected)
+
+    def test_add_unrelated_file_preserves_unstaged_route_edits(self):
+        working = self.original.replace("LearnSkill =", '-- unstaged text\n        LearnSkill =')
+        self.path.write_text(working, encoding="utf-8", newline="")
+        (self.root / "unrelated.txt").write_text("unrelated", encoding="utf-8")
+        self.git("add", "--", "unrelated.txt")
+        self.assertEqual(self.git("show", ":Routes/route with spaces.lua"), self.expected())
+        self.assertEqual(self.path.read_bytes(), working.encode("utf-8"))
 
     def test_commit_formats_staged_route_and_matching_working_copy(self):
         self.git("commit", "-qm", "Format route")

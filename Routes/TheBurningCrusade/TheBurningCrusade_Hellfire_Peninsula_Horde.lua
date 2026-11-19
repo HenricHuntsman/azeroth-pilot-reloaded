@@ -2,14 +2,15 @@ local L = LibStub("AceLocale-3.0"):GetLocale("APR")
 
 APR.RouteQuestStepList["85-BC-1-Horde"] = {
     label = L["BC01 - Hellfire Peninsula"],
+    author = "Jumbonero",
     expansion = APR.EXPANSIONS.TheBurningCrusade,
     category = APR.CATEGORIES.Leveling,
     prefab = {
         [APR.PREFAB_TYPES.Leveling] = 10,
     },
     mapID = 85,
-    conditions = { Faction = "Horde" },
-    nextRoute = {},
+    conditions = { Faction = "Horde", Level = 10 },
+    nextRoute = { "102-BC-2-Horde" },
     steps = {
         {
             PickUp = { 60123 },
@@ -1559,7 +1560,7 @@ APR.RouteQuestStepList["85-BC-1-Horde"] = {
             Qpart = { [9472] = { 1 } },
             Coord = { x = 4166.4, y = -723.1 },
             Range = 5,
-            RaidIcon = 17226,
+            RaidIcon = { { npcID = 17226, questID = 9472, objectiveIndex = 1 } },
             Zone = 100,
             _index = 233,
         },

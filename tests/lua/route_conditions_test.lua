@@ -1,5 +1,8 @@
 local function noop() end
-function LibStub() return { GetLocale = function() return {} end } end
+local locale = {}
+function LibStub()
+    return { GetLocale = function() return locale end }
+end
 
 APR = {
     interfaceVersion = 16001,
@@ -10,15 +13,18 @@ APR = {
     PlayerID = "player",
     ActiveRoute = "route",
     RouteQuestStepList = {},
-    Debug = noop
+    Debug = noop,
 }
+dofile("APR-Core/utils/Utils.lua")
 function APR:NewModule() return {} end
 
 local level, currentMap = 12, 1411
 function UnitLevel() return level end
 
 function tContains(t, v)
-    for _, x in ipairs(t) do if x == v then return true end end
+    for _, x in ipairs(t) do
+        if x == v then return true end
+    end
     return false
 end
 
@@ -35,12 +41,19 @@ function GetInventoryItemLink() return "item:123" end
 
 dofile("APR-Core/utils/PlayerUtils.lua")
 dofile("APR-Core/data/models/Enums.lua")
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/utils/RouteUtils.lua")
-dofile("APR-Core/utils/RouteManager.lua")
+dofile("APR-Core/features/questing/RouteManager.lua")
 local filters = {
     Money = { operator = "<", copper = 100 },
     ItemCount = { itemID = 10, count = 2 },
-    EquippedItemStat = { slot = 16, stat = "ITEM_MOD_DAMAGE_PER_SECOND_SHORT", operator = "<", value = 2.05, precision = 1 }
+    EquippedItemStat = {
+        slot = 16,
+        stat = "ITEM_MOD_DAMAGE_PER_SECOND_SHORT",
+        operator = "<",
+        value = 2.05,
+        precision = 1,
+    },
 }
 -- Vendor eligibility counts cash, bag stacks and only the selected equipment.
 do
@@ -108,13 +121,16 @@ function GetItemCount() return 3 end
 
 assert(APR:MeetsItemCount({ itemIDs = { 10, 11 }, operator = "==", count = 6 }))
 assert(not APR:CompareRouteNumber(3, "invalid", 3))
-assert(APR:StepUsesAnyOption({ AnyOf = { { Money = filters.Money } } }, { 'Money' }))
+assert(APR:StepUsesAnyOption({ AnyOf = { { Money = filters.Money } } }, { "Money" }))
 
 -- Class-specific follow-up branches use the existing step condition evaluator.
 APR.RouteQuestStepList.route = {
     expansion = APR.EXPANSIONS.Forever,
-    nextRoute = { { route = "warrior", conditions = { Class = "WARRIOR" } },
-        { route = "mage",    conditions = { Class = "MAGE" } }, "shared" }
+    nextRoute = {
+        { route = "warrior", conditions = { Class = "WARRIOR" } },
+        { route = "mage", conditions = { Class = "MAGE" } },
+        "shared",
+    },
 }
 for _, key in ipairs({ "warrior", "mage", "shared" }) do
     APR.RouteQuestStepList[key] = { expansion = APR.EXPANSIONS.Forever, label = key }
@@ -128,8 +144,10 @@ do
     local previousEnum = Enum
     local function isSpellKnown(id, isPetSpell)
         if C_SpellBook and Enum and Enum.SpellBookSpellBank then
-            assert(isPetSpell == nil or isPetSpell == Enum.SpellBookSpellBank.Pet,
-                "Modern spellbook requires a spell bank instead of a boolean")
+            assert(
+                isPetSpell == nil or isPetSpell == Enum.SpellBookSpellBank.Pet,
+                "Modern spellbook requires a spell bank instead of a boolean"
+            )
             isPetSpell = isPetSpell == Enum.SpellBookSpellBank.Pet
         else
             assert(isPetSpell == nil or type(isPetSpell) == "boolean")
@@ -158,14 +176,19 @@ do
         assert(APR:AreConditionalFiltersMet(nil))
         assert(APR:AreConditionalFiltersMet({ AllOf = {} }))
         assert(not APR:AreConditionalFiltersMet({ AnyOf = {} }))
-        assert(APR:GetRouteSkill({ skill = 'cooking' }) == 20, 'Localized profession name')
-        assert(APR:AreConditionalFiltersMet({ Not = { Skill = { skill = 'cooking', rank = 21 } } }))
-        assert(not APR:AreConditionalFiltersMet({ Not = { Skill = { skill = 'cooking', rank = 20 } } }))
+        assert(APR:GetRouteSkill({ skill = "cooking" }) == 20, "Localized profession name")
+        assert(APR:AreConditionalFiltersMet({ Not = { Skill = { skill = "cooking", rank = 21 } } }))
+        assert(not APR:AreConditionalFiltersMet({ Not = { Skill = { skill = "cooking", rank = 20 } } }))
         assert(APR:AreConditionalFiltersMet({
             AllOf = {
-                { Skill = { skill = 'cooking', rank = 20 } },
-                { AnyOf = { { EquippedItem = { slot = 16, itemID = 101 } }, { EquippedItem = { slot = 16, itemID = 100 } } } },
-            }
+                { Skill = { skill = "cooking", rank = 20 } },
+                {
+                    AnyOf = {
+                        { EquippedItem = { slot = 16, itemID = 101 } },
+                        { EquippedItem = { slot = 16, itemID = 100 } },
+                    },
+                },
+            },
         }))
         assert(not APR:AreConditionalFiltersMet({ EquippedItem = { slot = 16, itemID = 101 } }))
         assert(APR:AreConditionalFiltersMet({ EquippedItem = { slot = 17, invert = true } }))
@@ -181,10 +204,12 @@ do
         GetInventoryItemQuality = function() return quality end
         GetItemStats = function() return { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = dps } end
         dps = 1.84
-        local stats = { EquippedItemStat = {
-            { slot = 16, stat = "QUALITY", operator = "<", value = 7, allowMissing = true },
-            { slot = 16, stat = "ITEM_MOD_DAMAGE_PER_SECOND_SHORT", operator = "<", value = 1.9, precision = 1 },
-        } }
+        local stats = {
+            EquippedItemStat = {
+                { slot = 16, stat = "QUALITY", operator = "<", value = 7, allowMissing = true },
+                { slot = 16, stat = "ITEM_MOD_DAMAGE_PER_SECOND_SHORT", operator = "<", value = 1.9, precision = 1 },
+            },
+        }
         assert(APR:AreConditionalFiltersMet(stats))
         quality = 7
         assert(not APR:AreConditionalFiltersMet(stats), "First list requirement must also pass")
@@ -239,7 +264,8 @@ assert(#suggestions == 2 and suggestions[1].key == "warrior" and suggestions[2].
 APRData = { player = { route = 1 } }
 local currentStep, updates, timers = filters, 0, {}
 function APR:GetStep(index)
-    assert(index == 1); return currentStep
+    assert(index == 1)
+    return currentStep
 end
 
 function APR:UpdateStep() updates = updates + 1 end
@@ -249,9 +275,13 @@ C_Timer = {
         local timer = { callback = callback, Cancel = function(self) self.cancelled = true end }
         timers[#timers + 1] = timer
         return timer
-    end
+    end,
 }
-function wipe(t) for k in pairs(t) do t[k] = nil end end
+function wipe(t)
+    for k in pairs(t) do
+        t[k] = nil
+    end
+end
 
 local registrations = {}
 function CreateFrame()
@@ -260,12 +290,15 @@ function CreateFrame()
         RegisterEvent = function(_, name)
             registrations[name] = (registrations[name] or 0) + 1
         end,
-        UnregisterAllEvents = noop
+        UnregisterAllEvents = noop,
     }
 end
 
 dofile("APR-Core/core/Event.lua")
-for _ = 1, 10 do APR.event.functions.money() end
+dofile("APR-Core/features/questing/NPCInteraction.lua")
+for _ = 1, 10 do
+    APR.event.functions.money()
+end
 assert(#timers == 1)
 timers[1].callback()
 assert(updates == 1)
@@ -275,27 +308,36 @@ assert(#timers == 1, "Unrelated quest steps do not rebuild on money/bag changes"
 currentStep = filters
 APR.event.functions.money()
 -- Specific event ownership: each new event has only one subscription.
-APR.event:MyRegisterEvent()
-for _, name in ipairs({ 'CHAT_MSG_LOOT', 'BAG_UPDATE_DELAYED', 'PLAYER_MONEY',
-    'UNIT_SPELLCAST_START', 'UNIT_SPELLCAST_SUCCEEDED', 'TRAINER_SHOW', 'BANKFRAME_OPENED',
-    'PLAYERBANKSLOTS_CHANGED', 'SKILL_LINES_CHANGED', 'PLAYER_EQUIPMENT_CHANGED' }) do
-    assert(registrations[name] == 1, name .. ' must have one owner')
+APR.event:RegisterEvents()
+for _, name in ipairs({
+    "CHAT_MSG_LOOT",
+    "BAG_UPDATE_DELAYED",
+    "PLAYER_MONEY",
+    "UNIT_SPELLCAST_START",
+    "UNIT_SPELLCAST_SUCCEEDED",
+    "TRAINER_SHOW",
+    "BANKFRAME_OPENED",
+    "PLAYERBANKSLOTS_CHANGED",
+    "SKILL_LINES_CHANGED",
+    "PLAYER_EQUIPMENT_CHANGED",
+}) do
+    assert(registrations[name] == 1, name .. " must have one owner")
 end
 assert(not APR.event.functions.routeActions and not APR.event.functions.routeResources)
 APR.event:CleanupEvents()
 assert(timers[2].cancelled and not APR.event.stepRefreshTimer)
 currentStep = { Collection = { itemID = 10, quantity = 3 } }
 APR.event.functions.money()
-assert(#timers == 2, 'Money cannot refresh an inventory-only condition')
+assert(#timers == 2, "Money cannot refresh an inventory-only condition")
 function APR:SaveBankItemCounts() end
 
 function APR:RefreshLevelProfileTargets() end
 
-APR.event.functions.inventory('BAG_UPDATE_DELAYED')
-assert(#timers == 3, 'Inventory changes refresh Collection')
-APR.event.functions.bank('BANKFRAME_OPENED')
-assert(APR.routeBankOpen and #timers == 3, 'Bank event shares coalesced refresh')
-APR.event.functions.bank('BANKFRAME_CLOSED')
+APR.event.functions.inventory("BAG_UPDATE_DELAYED")
+assert(#timers == 3, "Inventory changes refresh Collection")
+APR.event.functions.bank("BANKFRAME_OPENED")
+assert(APR.routeBankOpen and #timers == 3, "Bank event shares coalesced refresh")
+APR.event.functions.bank("BANKFRAME_CLOSED")
 assert(not APR.routeBankOpen)
 currentStep = { AnyOf = { { VendorMoney = { copper = 102, equippedSlots = { 16 } } } } }
 for _, event in ipairs({ "money", "equipment", "inventory" }) do
@@ -304,6 +346,17 @@ for _, event in ipairs({ "money", "equipment", "inventory" }) do
     APR.event.functions[event]()
     assert(#timers == before + 1, event .. " refreshes nested VendorMoney conditions")
 end
+APR.event:CleanupEvents()
+currentStep = { SkillGoal = { skillID = 8888, rank = 10 } }
+local beforeSkillTimers, beforeSkillUpdates = #timers, updates
+for _ = 1, 20 do APR.event.functions.skill() end
+assert(#timers == beforeSkillTimers + 1, "Skill bursts share one existing dispatcher refresh")
+timers[#timers].callback()
+assert(updates == beforeSkillUpdates + 1)
+currentStep = { PickUp = { 1 } }
+APR.event.functions.skill()
+assert(#timers == beforeSkillTimers + 1, "Unrelated steps stay dormant on skill changes")
+APR.event:CleanupEvents()
 print("Route resources: money, inventory, equipment, Hardcore, branching and coalesced events passed")
 
 -- Primary-profession limits control both visibility and automatic progression.
@@ -349,7 +402,119 @@ do
     check({ Zones = { 2393, 2413 }, SkipInZones = { 2393 } }, 2393, false)
     check({ Zones = { 2393, 2413 }, SkipInZones = { 2393 } }, 2413, true)
     check({ OnlyInZones = { 2541 }, SkipForLvl = 88 }, 2541, false)
+    check({ OnlyInZones = { 2541 }, SkipForLvl = 88 }, 2393, false)
     check({ Zone = 2541 }, 2393, true)
     print(
-        "Zone conditions: inclusion/exclusion, multiple maps, missing map, composition and navigation-only Zone passed")
+        "Zone conditions: inclusion/exclusion, multiple maps, missing map, composition and navigation-only Zone passed"
+    )
+end
+
+-- Mana/cooldown usability and cursor changes must not redraw parallel groups.
+do
+    APR.event:CleanupEvents()
+    currentStep = { HasSpell = 123, ItemCount = { itemID = 10, count = 1 } }
+    local buttons, before = 0, #timers
+    APR.currentStep = { UpdateStepButtonUsability = function() buttons = buttons + 1 end }
+    for i = 1, 100 do
+        APR.event.functions.spellbook("SPELL_UPDATE_USABLE")
+        APR.event.functions.inventory("CURSOR_CHANGED")
+    end
+    assert(buttons == 200 and #timers == before, "Usability-only events update buttons without scheduling full renders")
+    APR.event.functions.spellbook("SPELLS_CHANGED")
+    assert(#timers == before + 1, "Learning a spell still refreshes conditions")
+    APR.event:CleanupEvents()
+    APR.event.functions.inventory("BAG_UPDATE_DELAYED")
+    assert(#timers == before + 2, "Actual bag changes still refresh conditions")
+end
+
+do
+    local getName, getSkill = APR.GetSpellName, C_SkillInfo
+    APR.GetSpellName = function() error("Numeric skill lookup must not fetch a localized spell name") end
+    C_SkillInfo = {
+        GetSkillLineInfoByID = function(id)
+            assert(id == 186)
+            return { rank = 12, maxRank = 75 }
+        end,
+    }
+    assert(APR:GetRouteSkill({ skill = "mining" }) == 12)
+    assert(APR:GetRouteSkill({ skillID = 186, maximum = true }) == 75)
+    local goal = { SkillGoal = { skillID = 186, rank = 15 }, Class = "WARRIOR" }
+    assert(APR:StepFilterQoL(goal) and not APR:StepFilterQuestHandler(goal), "A pending goal is visible and actionable")
+    goal.Class = "MAGE"
+    assert(not APR:StepFilterQoL(goal) and APR:StepFilterQuestHandler(goal), "Goal visibility uses the same class filters")
+
+    local meetsItem, extended = APR.MeetsItemCount, APR.MeetsExtendedRouteConditions
+    APR.MeetsItemCount = function() return false end
+    APR.MeetsExtendedRouteConditions = function() error("Missing item must short circuit skill checks") end
+    assert(not APR:AreConditionalFiltersMet({ ItemCount = {}, Skill = { skillID = 186 } }))
+    APR.MeetsItemCount, APR.MeetsExtendedRouteConditions = meetsItem, extended
+    APR.GetSpellName, C_SkillInfo = getName, getSkill
+end
+
+-- Empty/simple predicates must not query unrelated game systems.
+do
+    local getLevel, getMap, spec, extended =
+        APR.GetPlayerEffectiveLevel, C_Map.GetBestMapForUnit, C_SpecializationInfo, APR.MeetsExtendedRouteConditions
+    local function unexpected() error("Unrelated condition API queried") end
+    APR.GetPlayerEffectiveLevel, C_Map.GetBestMapForUnit = unexpected, unexpected
+    C_SpecializationInfo = { GetSpecialization = unexpected }
+    APR.MeetsExtendedRouteConditions = unexpected
+    assert(APR:AreConditionalFiltersMet({}))
+    assert(APR:AreConditionalFiltersMet({ Faction = "Horde" }))
+    APR.GetPlayerEffectiveLevel, C_Map.GetBestMapForUnit = getLevel, getMap
+    C_SpecializationInfo, APR.MeetsExtendedRouteConditions = spec, extended
+end
+
+-- Hearthstone lookahead skips definite exclusions without applying today's
+-- location to tomorrow's arrival or executing any route action.
+dofile("APR-Core/utils/StepUtils.lua")
+do
+    local steps = {
+        { UseHS = 42 },
+        { Faction = "Alliance", Zone = 10 },
+        { Class = "MAGE", Zone = 20 },
+        { Faction = "Horde", Zones = { 99999 }, Zone = 30 },
+        { Zone = 40 },
+    }
+    local candidate, index = APR:GetNextApplicableStep(steps, 1)
+    assert(candidate == steps[4] and index == 4, "Skip faction/class filters, retain arrival-zone conditions")
+    assert(steps[4].Zones[1] == 99999, "Lookahead leaves route conditions unchanged")
+    assert(APR:GetNextApplicableStep(steps, #steps) == nil)
+    steps[2] = { Not = { OnlyInZones = { 1411 } }, Zone = 50 }
+    assert(APR:GetNextApplicableStep(steps, 1) == steps[2], "Negating an unknown location remains unknown")
+    steps[2] = { AnyOf = { { Faction = "Alliance" }, { OnlyInZones = { 99999 } } }, Zone = 50 }
+    assert(APR:GetNextApplicableStep(steps, 1) == steps[2])
+    steps[2] = { AllOf = { { Faction = "Alliance" }, { OnlyInZones = { 99999 } } }, Zone = 50 }
+    assert(APR:GetNextApplicableStep(steps, 1) == steps[4])
+end
+
+-- Waypoint destination summaries obey character filters, including nested
+-- branches, but retain instructions whose arrival location is not known yet.
+do
+    local oldClass, oldRoute, oldData = APR.ClassName, APR.RouteQuestStepList.route, APRData
+    local oldKeys, oldText, oldResolve = APR.routeActionKeys, APR.GetRouteActionText, APR.ResolveStepText
+    locale.WAYPOINT, locale.RUN_WAYPOINT, locale.TURN_IN_Q = "Waypoint", "Walk", "Hand in"
+    locale.TRAVEL_TO = "Travel"
+    APR.routeActionKeys = { "LearnSkill" }
+    APR.GetRouteActionText = function(_, _, rule) return "Learn " .. rule.spellID end
+    APR.ResolveStepText = function(_, text) return text end
+    APRData = { player = { route = 1 } }
+    local steps = {
+        { Waypoint = 1, Note = { "Descend" } },
+        { Note = { "Excluded note" }, Faction = "Alliance" },
+        { LearnSkill = { spellID = 10001 }, AllOf = { { Class = "MAGE" }, { OnlyInZones = { 99999 } } } },
+        { Done = { 10002 }, Class = "PRIEST", OnlyInZones = { 99999 } },
+    }
+    APR.RouteQuestStepList.route = { steps = steps }
+    APR.ClassName = "PRIEST"
+    assert(APR:CheckWaypointText() == "[Waypoint] - Hand in", "Priest must not preview another class's training")
+    APR.ClassName = "MAGE"
+    assert(APR:CheckWaypointText() == "[Waypoint] - Learn 10001", "Eligible training remains visible across travel")
+    APR.ClassName = "WARRIOR"
+    assert(APR:CheckWaypointText() == "[Waypoint] - Descend", "Use the eligible note when no action applies")
+    steps[1].Note = nil
+    assert(APR:CheckWaypointText() == "Travel - Waypoint", "Excluded notes cannot become a fallback")
+    assert(steps[3].AllOf[2].OnlyInZones[1] == 99999 and APRData.player.route == 1, "Preview is read-only")
+    APR.ClassName, APR.RouteQuestStepList.route, APRData = oldClass, oldRoute, oldData
+    APR.routeActionKeys, APR.GetRouteActionText, APR.ResolveStepText = oldKeys, oldText, oldResolve
 end

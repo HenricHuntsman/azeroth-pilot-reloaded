@@ -11,30 +11,98 @@ local function widget(parent)
         height = 12,
         width = 250,
         hideCount = 0,
-        anchors = 0
+        anchors = 0,
     }, {
         __index = function(_, key)
-            return methods[key] or ((key:match("^Set") or key:match("^Register") or
-                key:match("^Enable") or key:match("^Disable") or key == "Clear") and noop or nil)
-        end
+            return methods[key]
+                or (
+                    (
+                            key:match("^Set")
+                            or key:match("^Register")
+                            or key:match("^Enable")
+                            or key:match("^Disable")
+                            or key == "Clear"
+                        )
+                        and noop
+                    or nil
+                )
+        end,
     })
 end
 local function protected(frame)
     if frame.secure then return true end
-    for _, child in ipairs(frame.children or {}) do if protected(child) then return true end end
+    for _, child in ipairs(frame.children or {}) do
+        if protected(child) then return true end
+    end
     return false
 end
 local function check(frame) assert(not combat or not protected(frame), "Protected mutation in combat") end
 function methods:SetScript(key, fn) self.scripts[key] = fn end
+function methods:UnregisterAllEvents() self.events = {} end
 
-function methods:SetText(text) self.text = text end
+function methods:HookScript(key, fn)
+    local previous = self.scripts[key]
+    self.scripts[key] = function(...)
+        if previous then previous(...) end
+        fn(...)
+    end
+end
+
+function methods:SetShown(value)
+    if value then
+        self:Show()
+    else
+        self:Hide()
+    end
+end
+
+function methods:IsEnabled() return self.enabled ~= false end
+
+function methods:SetEnabled(value) self.enabled = value end
+
+function methods:GetFrameLevel() return self.level or 1 end
+function methods:GetFrameStrata() return self.strata or "MEDIUM" end
+function methods:SetFrameStrata(value) self.strata = value end
+
+function methods:SetFrameLevel(value) self.level = value end
+
+function methods:SetBackdrop(value) self.backdrop = value end
+
+function methods:GetBackdrop() return self.backdrop end
+
+function methods:SetBackdropColor(...) self.backdropColor = { ... } end
+
+function methods:GetBackdropColor() return unpack(self.backdropColor or { 0, 0, 0, 1 }) end
+
+function methods:SetBackdropBorderColor(...) self.borderColor = { ... } end
+
+function methods:SetFontString(value) self.label = value end
+
+function methods:GetFontString() return self.label end
+
+function methods:StopMovingOrSizing() self.moving = false end
+
+function methods:ClearFocus() self.focused = false end
+
+function methods:SetFocus() self.focused = true end
+
+function methods:HasFocus() return self.focused == true end
+
+function methods:HighlightText() self.highlighted = true end
+
+function methods:SetText(text)
+    self.text = text
+    if self.label then self.label.text = text end
+end
 
 function methods:GetText() return self.text end
 
 function methods:GetStringHeight() return math.max(1, math.ceil(#(self.text or "") / 30)) * 12 end
+function methods:GetStringWidth() return #(self.text or "") * 6 end
 
 function methods:SetHeight(height)
-    check(self); self.height = height
+    check(self)
+    self.height = height
 end
 
 function methods:GetHeight() return self.height end
@@ -44,21 +112,36 @@ function methods:SetWidth(width) self.width = width end
 function methods:GetWidth() return self.width end
 
 function methods:GetScale() return self.scale or 1 end
+function methods:GetEffectiveScale() return self:GetScale() * (self.parent and self.parent:GetEffectiveScale() or 1) end
+function methods:GetPoint()
+    if not self.point then return end
+    local point, relative, relativePoint, x, y = unpack(self.point)
+    if relative == nil or type(relative) == "number" then
+        return point, self.parent, point, relative or 0, relativePoint or 0
+    end
+    return point, relative, relativePoint or point, x or 0, y or 0
+end
+function methods:GetNumPoints() return self.point and 1 or 0 end
 
 function methods:SetScale(value)
-    check(self); self.scale = value
+    check(self)
+    self.scale = value
 end
 
 function methods:GetParent() return self.parent end
 
 function methods:SetScrollChild(child)
-    self.scrollChild = child; self.swaps = (self.swaps or 0) + 1
+    self.scrollChild = child
+    self.swaps = (self.swaps or 0) + 1
 end
+
+function methods:GetScrollChild() return self.scrollChild end
 
 function methods:GetVerticalScroll() return self.scroll or 0 end
 
-function methods:GetVerticalScrollRange() return math.max(0,
-        (self.scrollChild and self.scrollChild:GetHeight() or 0) - self.height) end
+function methods:GetVerticalScrollRange()
+    return math.max(0, (self.scrollChild and self.scrollChild:GetHeight() or 0) - self.height)
+end
 
 function methods:SetVerticalScroll(value) self.scroll = value end
 
@@ -67,52 +150,96 @@ function methods:GetOwner() return self.owner end
 function methods:SetOwner(owner) self.owner = owner end
 
 function methods:ClearAllPoints()
-    check(self); self.anchors = self.anchors + 1
+    check(self)
+    self.anchors = self.anchors + 1
 end
 
 function methods:SetPoint(...)
-    check(self); self.point = { ... }
+    check(self)
+    self.point = { ... }
 end
 
-function methods:SetSize(width, height) self.width, self.height = width, height end
+function methods:SetSize(width, height)
+    self.width, self.height = width, height
+end
+
+function methods:GetSize() return self.width, self.height end
+
+function methods:Raise() self.raised = true end
 
 function methods:SetParent(parent)
-    check(self); self.parent = parent
+    check(self)
+    self.parent = parent
 end
 
 function methods:Hide()
-    check(self); self.shown = false; self.hideCount = self.hideCount + 1
+    check(self)
+    self.shown = false
+    self.hideCount = self.hideCount + 1
 end
 
 function methods:Show()
-    check(self); self.shown = true
+    check(self)
+    self.shown = true
 end
 
 function methods:IsShown() return self.shown end
 
+function methods:CreateAnimationGroup()
+    local animation = { playing = false }
+    function animation:CreateAnimation()
+        return {
+            SetDegrees = function() end,
+            SetDuration = function() end,
+            SetFromAlpha = function() end,
+            SetToAlpha = function() end,
+            SetSmoothing = function() end,
+        }
+    end
+    function animation:SetLooping() end
+    function animation:Play()
+        self.playing = true
+        self.starts = (self.starts or 0) + 1
+    end
+    function animation:Stop() self.playing = false end
+    function animation:IsPlaying() return self.playing end
+    return animation
+end
+
+function methods:Stop() self.playing = false end
+
 function methods:IsProtected() return self.secure end
 
 function methods:CreateFontString()
-    fonts = fonts + 1; return widget(self)
+    fonts = fonts + 1
+    return widget(self)
 end
 
 function methods:CreateTexture() return widget(self) end
+function methods:CreateLine() return widget(self) end
+function methods:SetStartPoint(...) self.startPoint = { ... } end
+function methods:SetEndPoint(...) self.endPoint = { ... } end
 
-function methods:SetNormalTexture() self.normal = widget(self) end
+for _, state in ipairs({ "Normal", "Pushed", "Disabled", "Highlight", "Thumb" }) do
+    local key = state .. "Texture"
+    methods["Set" .. key] = function(self, value)
+        self[key] = rawget(self, key) or widget(self)
+        self[key].texture = value
+    end
+    methods["Get" .. key] = function(self) return rawget(self, key) end
+end
 
-function methods:GetNormalTexture() return self.normal end
-
-function methods:GetHighlightTexture() return nil end
-
-function methods:GetPushedTexture() return nil end
-
-function methods:SetMinMaxValues(low, high) self.minimum, self.maximum = low, high end
+function methods:SetMinMaxValues(low, high)
+    self.minimum, self.maximum = low, high
+end
 
 function methods:SetValue(value) self.value = value end
 
 function methods:SetStatusBarColor(...) self.color = { ... } end
 
 function methods:SetAlpha(alpha) self.alpha = alpha end
+
+function methods:GetAttribute(key) return (self.attributes or {})[key] end
 
 function methods:SetAttribute(key, value)
     check(self)
@@ -123,7 +250,14 @@ end
 function CreateFrame(_, name, parent, template)
     frames = frames + 1
     local frame = widget(parent)
+    frame.name = name
     frame.secure = template and template:find("SecureActionButtonTemplate") ~= nil
+    if template == "UIPanelScrollFrameTemplate" then
+        frame.ScrollBar = widget(frame)
+        frame.ScrollBar.ScrollUpButton, frame.ScrollBar.ScrollDownButton =
+            widget(frame.ScrollBar), widget(frame.ScrollBar)
+        frame.ScrollBar:SetThumbTexture("Blizzard thumb")
+    end
     if parent then
         parent.children = parent.children or {}
         table.insert(parent.children, frame)
@@ -136,13 +270,18 @@ function InCombatLockdown() return combat end
 
 function hooksecurefunc() end
 
-function wipe(t) for key in pairs(t) do t[key] = nil end end
+function wipe(t)
+    for key in pairs(t) do
+        t[key] = nil
+    end
+end
 
 function LibStub()
     return {
         GetLocale = function() return {} end,
         SetScale = function(frame, scale) frame:SetScale(scale) end,
         RegisterConfig = noop,
+        MakeDraggable = noop,
         SavePosition = noop,
         RestorePosition = noop,
     }
@@ -150,6 +289,8 @@ end
 
 UIParent, GameTooltip = widget(), widget()
 APR = {
+    GAME_VERSIONS = { Retail = "retail", Classic = "classic", Forever = "forever" },
+    GetGameVersion = function() return "retail" end,
     Color = { defaultBackdrop = { 0, 0, 0, 1 }, blue = { 0, 0.5, 1 } },
     Debug = noop,
     settings = { profile = { currentStepShow = true, currentStepbackgroundColorAlpha = { 0, 0, 0, 1 } } },
@@ -157,6 +298,9 @@ APR = {
     SetupFrameDrag = noop,
     SetupMinimizeButton = noop,
     RegisterFontString = noop,
+    SetFontStringRole = function(_, font, role)
+        if font then font.role = role end
+    end,
     fillersFrame = { RemoveFillerSteps = noop },
     questOrderList = { ApplySnapAnchor = function() layouts = layouts + 1 end },
     GetQuestObjectiveProgressPercent = noop,
@@ -170,6 +314,7 @@ APR = {
 function APR:NewModule() return {} end
 
 function APR:GetSettingsProfile() return self.settings.profile end
+dofile("APR-Core/ui/foundations/ReloadConfirmation.lua")
 
 function APR:SetupMinimizeButton(header, parent, collapse, expand)
     header.MinimizeButton:SetScript("OnClick", function()
@@ -202,9 +347,26 @@ C_Item = { GetItemInfo = function(id) return "Item " .. id, nil, nil, nil, nil, 
 C_QuestLog = { GetTitleForQuestID = function(id) return "Quest " .. id end }
 UNKNOWN = "Unknown"
 dofile("APR-Core/utils/QuestUtils.lua")
+dofile("APR-Core/ui/foundations/Themes.lua")
 dofile("APR-Core/ui/foundations/StatusBars.lua")
+local targetingMacroStub = APR.BuildRaidIconMacro
+dofile("APR-Core/utils/SecretUtils.lua")
+dofile("APR-Core/utils/TargetUtils.lua")
+APR.BuildRaidIconMacro = targetingMacroStub
 dofile("APR-Core/ui/route/CurrentStep.lua")
 dofile("APR-Core/ui/route/CurrentStepRows.lua")
+APR.fillersFrame.Frame = CreateFrame("Frame", nil, UIParent)
+APR.fillersFrame.StepHolder = CreateFrame("Frame", nil, APR.fillersFrame.Frame)
+dofile("APR-Core/ui/route/RaidIconButtons.lua")
+-- Use the real shared snapping functions while retaining the mock frame builders.
+local standard, header, row = APR.CreateStandardFrame, APR.CreateFrameHeader, APR.CreateStepTextContainer
+local drag, headerDrag, minimize = APR.SetupFrameDrag, APR.SetupHeaderDrag, APR.SetupMinimizeButton
+local tooltip = APR.AddQuestTooltipDetails
+dofile("APR-Core/utils/UIUtils.lua")
+APR.CreateStandardFrame, APR.CreateFrameHeader, APR.CreateStepTextContainer = standard, header, row
+APR.SetupFrameDrag, APR.SetupHeaderDrag, APR.SetupMinimizeButton = drag, headerDrag, minimize
+APR.AddQuestTooltipDetails = tooltip
+dofile("APR-Core/integrations/QuestTracker.lua")
 
 return {
     frames = function() return frames end,

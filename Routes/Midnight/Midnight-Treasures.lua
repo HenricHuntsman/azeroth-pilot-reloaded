@@ -503,12 +503,21 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             _index = 61,
         },
         {
+            Waypoint = 89168,
+            NonSkippableWaypoint = true,
+            Coord = APR.worldCoordinateConverter:ConvertMapCoordinate(2413, 69.89, 50.34),
+            Range = 5,
+            HasSpell = 471014,
+            Zone = 2413,
+            _index = 62,
+        },
+        {
             Treasure = { questID = 89168, itemID = 238630 },
             Coord = { x = -1685.5, y = 45.0 },
             Range = 0.5,
             HasSpell = 471014,
             Zone = 2413,
-            _index = 62,
+            _index = 63,
         },
         {
             Treasure = { questID = 89159, itemID = 238471 },
@@ -516,7 +525,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471009,
             Zone = 2413,
-            _index = 63,
+            _index = 64,
         },
         {
             Treasure = { questID = 89095, itemID = 238594 },
@@ -524,7 +533,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471012,
             Zone = 2413,
-            _index = 64,
+            _index = 65,
         },
         {
             Treasure = { questID = 89113, itemID = 238534 },
@@ -532,7 +541,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471003,
             Zone = 2413,
-            _index = 65,
+            _index = 66,
         },
         {
             Treasure = { questID = 89104, itemID = 238552 },
@@ -540,7 +549,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471006,
             Zone = 2413,
-            _index = 66,
+            _index = 67,
         },
         {
             Treasure = { questID = 89162, itemID = 238468 },
@@ -548,7 +557,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471009,
             Zone = 2413,
-            _index = 67,
+            _index = 68,
         },
         {
             Treasure = { questID = 89151, itemID = 238603 },
@@ -556,7 +565,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471013,
             Zone = 2413,
-            _index = 68,
+            _index = 69,
         },
         {
             Treasure = { questID = 89155, itemID = 238475 },
@@ -564,14 +573,14 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471009,
             Zone = 2413,
-            _index = 69,
+            _index = 70,
         },
         {
             TakePortal = { questID = 89102, mapID = 2405 },
             Coord = { x = -434.4, y = -285.5 },
             ZoneStepTrigger = { Range = 15, x = -448.9, y = 895.8 },
             Zone = 2413,
-            _index = 70,
+            _index = 71,
         },
         {
             Treasure = { questID = 89102, itemID = 238550 },
@@ -579,7 +588,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471006,
             Zone = 2405,
-            _index = 71,
+            _index = 72,
         },
         {
             Treasure = { questID = 89156, itemID = 238474 },
@@ -587,7 +596,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471009,
             Zone = 2405,
-            _index = 72,
+            _index = 73,
         },
         {
             Treasure = { questID = 89090, itemID = 238589 },
@@ -595,7 +604,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471012,
             Zone = 2405,
-            _index = 73,
+            _index = 74,
         },
         {
             Treasure = { questID = 89118, itemID = 238539 },
@@ -603,15 +612,15 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471003,
             Zone = 2405,
-            _index = 74,
+            _index = 75,
         },
         {
             Treasure = { questID = 89150, itemID = 238602 },
-            Coord = { x = 547.8, y = 3065.1 },
+            Coord = APR.worldCoordinateConverter:ConvertMapCoordinate(2444, 34.27, 76.07),
             Range = 0.5,
             HasSpell = 471013,
-            Zone = 2405,
-            _index = 75,
+            Zone = 2444,
+            _index = 76,
         },
         {
             Treasure = { questID = 89144, itemID = 238596 },
@@ -619,7 +628,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471013,
             Zone = 2405,
-            _index = 76,
+            _index = 77,
         },
         {
             Treasure = { questID = 89123, itemID = 238581 },
@@ -627,7 +636,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471011,
             Zone = 2405,
-            _index = 77,
+            _index = 78,
         },
         {
             Treasure = { questID = 89181, itemID = 238544 },
@@ -635,7 +644,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471004,
             Zone = 2405,
-            _index = 78,
+            _index = 79,
         },
         {
             Treasure = { questID = 89134, itemID = 238557 },
@@ -643,7 +652,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471007,
             Zone = 2405,
-            _index = 79,
+            _index = 80,
         },
         {
             Treasure = { questID = 89148, itemID = 238600 },
@@ -651,7 +660,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471013,
             Zone = 2405,
-            _index = 80,
+            _index = 81,
         },
         {
             Treasure = { questID = 89112, itemID = 238533 },
@@ -659,7 +668,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471003,
             Zone = 2405,
-            _index = 81,
+            _index = 82,
         },
         {
             Treasure = { questID = 89169, itemID = 238631 },
@@ -667,7 +676,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471014,
             Zone = 2405,
-            _index = 82,
+            _index = 83,
         },
         {
             Treasure = { questID = 89093, itemID = 238592 },
@@ -675,7 +684,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471012,
             Zone = 2405,
-            _index = 83,
+            _index = 84,
         },
         {
             Treasure = { questID = 89137, itemID = 238560 },
@@ -683,7 +692,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471007,
             Zone = 2405,
-            _index = 84,
+            _index = 85,
         },
         {
             Treasure = { questID = 89128, itemID = 238586 },
@@ -691,7 +700,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471011,
             Zone = 2405,
-            _index = 85,
+            _index = 86,
         },
         {
             Treasure = { questID = 89146, itemID = 238598 },
@@ -699,7 +708,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471013,
             Zone = 2405,
-            _index = 86,
+            _index = 87,
         },
         {
             Treasure = { questID = 89126, itemID = 238584 },
@@ -707,7 +716,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471011,
             Zone = 2405,
-            _index = 87,
+            _index = 88,
         },
         {
             Treasure = { questID = 89082, itemID = 238616 },
@@ -715,7 +724,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471015,
             Zone = 2405,
-            _index = 88,
+            _index = 89,
         },
         {
             Treasure = { questID = 89067, itemID = 238572 },
@@ -723,7 +732,7 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471010,
             Zone = 2405,
-            _index = 89,
+            _index = 90,
         },
         {
             Treasure = { questID = 89083, itemID = 238617 },
@@ -731,11 +740,11 @@ APR.RouteQuestStepList["2395-Midnight-Profession-Treasures"] = {
             Range = 0.5,
             HasSpell = 471015,
             Zone = 2405,
-            _index = 90,
+            _index = 91,
         },
         {
             RouteCompleted = true,
-            _index = 91,
+            _index = 92,
         },
     }
 }
@@ -870,6 +879,7 @@ APR.RouteQuestStepList["2393-Midnight-Treasures-Eversong-Woods"] = {
         {
             GossipOptionIDs = { 136684 },
             Coord = { x = -3663.4, y = 6342.1 },
+            IsQuestUncompleted = 93061,
             Zone = 2395,
             _index = 18,
         },
@@ -893,11 +903,11 @@ APR.RouteQuestStepList["2393-Midnight-Treasures-Eversong-Woods"] = {
             Note = { "PICK_UP_CUP", "STEP_ON_FIRE_CIRCLES_TO_COLLECT_5_PHOENIX_CINDER", "THEN_PUT_CUP_BACK_ONCE_YOU_HAVE_5" },
             Coord = { x = -3710.6, y = 8942.4 },
             Range = 1,
-            Buffs = { { spellId = 1264567, tooltipMessage = "PICK_UP_CUP" }, { spellId = 1264565, tooltipMessage = "YOU_HAVE_TO_STEP_ON_FIRE_CIRCLES_TO_COLLECT_5_PHOENIX_CINDER" } },
+            Buffs = { { spellId = 1264567, tooltipMessage = "PICK_UP_CUP" }, { spellId = 1264565, tooltipMessage = "STEP_ON_FIRE_CIRCLES_TO_COLLECT_5_PHOENIX_CINDER" } },
             Zone = 2537,
             _index = 21,
         },
-        { RouteCompleted = true, _index = 10 },
+        { RouteCompleted = true, _index = 22 },
     },
 }
 
@@ -1111,7 +1121,7 @@ APR.RouteQuestStepList["2413-Midnight-Treasures-Harandar"] = {
             ExtraLineText = "GO_INSIDE_CAVE",
             Coord = { x = 1497.9, y = -904.1 },
             Range = 5,
-            RaidIcon = 250317,
+            RaidIcon = { { npcID = 250317 } },
             Zone = 2413,
             _index = 6,
         },
@@ -1144,6 +1154,7 @@ APR.RouteQuestStepList["2413-Midnight-Treasures-Harandar"] = {
         {
             GossipOptionIDs = { 137233 },
             Coord = { x = 1569.3, y = -901.7 },
+            IsQuestUncompleted = 93508,
             Zone = 2413,
             _index = 11,
         },
@@ -1181,18 +1192,21 @@ APR.RouteQuestStepList["2413-Midnight-Treasures-Harandar"] = {
         {
             GossipOptionIDs = { 136764 },
             Coord = { x = -294.4, y = -428.3 },
+            IsQuestUncompleted = 93144,
             Zone = 2413,
             _index = 16,
         },
         {
             GossipOptionIDs = { 136767 },
             Coord = { x = -294.4, y = -428.3 },
+            IsQuestUncompleted = 93144,
             Zone = 2413,
             _index = 17,
         },
         {
             GossipOptionIDs = { 136757 },
             Coord = { x = 6.4, y = -154.8 },
+            IsQuestUncompleted = 93144,
             Zone = 2413,
             _index = 18,
         },
@@ -1205,12 +1219,14 @@ APR.RouteQuestStepList["2413-Midnight-Treasures-Harandar"] = {
         {
             GossipOptionIDs = { 136757 },
             Coord = { x = 6.5, y = -155.4 },
+            IsQuestUncompleted = 93144,
             Zone = 2413,
             _index = 20,
         },
         {
             GossipOptionIDs = { 136760 },
             Coord = { x = 6.5, y = -155.4 },
+            IsQuestUncompleted = 93144,
             Zone = 2413,
             _index = 21,
         },
@@ -1223,12 +1239,14 @@ APR.RouteQuestStepList["2413-Midnight-Treasures-Harandar"] = {
         {
             GossipOptionIDs = { 136716 },
             Coord = { x = -293.3, y = 127.8 },
+            IsQuestUncompleted = 93144,
             Zone = 2413,
             _index = 23,
         },
         {
             GossipOptionIDs = { 136721 },
             Coord = { x = -293.3, y = 127.8 },
+            IsQuestUncompleted = 93144,
             Zone = 2413,
             _index = 24,
         },
@@ -1256,7 +1274,7 @@ APR.RouteQuestStepList["2413-Midnight-Treasures-Harandar"] = {
             Zone = 2413,
             _index = 27,
         },
-        { RouteCompleted = true, _index = 10 },
+        { RouteCompleted = true, _index = 28 },
     },
 }
 
@@ -1309,7 +1327,7 @@ APR.RouteQuestStepList["2405-Midnight-Treasures-Voidstorm"] = {
         },
         {
             Waypoint = 94454,
-            ExtraLineText = "OUT_CAVE",
+            ExtraLineText = "EXIT_CAVE",
             Coord = { x = -170.1, y = 344 },
             Range = 5,
             Zone = 2405,
@@ -1517,28 +1535,32 @@ APR.RouteQuestStepList["2512-Midnight-Treasures-Coiled-Isle"] = {
         {
             GossipOptionIDs = { 139435 },
             Coord = { x = -12069.3, y = 6102.2 },
-            RaidIcon = 263265,
+            RaidIcon = { { npcID = 263265 } },
+            IsQuestUncompleted = 95976,
             Zone = 2512,
             _index = 1,
         },
         {
             GossipOptionIDs = { 139436 },
             Coord = { x = -12059.3, y = 5932.4 },
-            RaidIcon = 262204,
+            RaidIcon = { { npcID = 262204 } },
+            IsQuestUncompleted = 95976,
             Zone = 2512,
             _index = 2,
         },
         {
             GossipOptionIDs = { 139438 },
             Coord = { x = -11991.1, y = 5951.5 },
-            RaidIcon = 253837,
+            RaidIcon = { { npcID = 253837 } },
+            IsQuestUncompleted = 95976,
             Zone = 2512,
             _index = 3,
         },
         {
             GossipOptionIDs = { 139436, 139437 },
             Coord = { x = -12060.1, y = 5932.6 },
-            RaidIcon = 262204,
+            RaidIcon = { { npcID = 262204 } },
+            IsQuestUncompleted = 95976,
             Zone = 2512,
             _index = 4,
         },
@@ -1546,7 +1568,7 @@ APR.RouteQuestStepList["2512-Midnight-Treasures-Coiled-Isle"] = {
             LootItems = { { itemID = 271792, quantity = 1, questID = 95976 } },
             Coord = { x = -12069.4, y = 6102.3 },
             GossipOptionIDs = { 139435, 139434 },
-            RaidIcon = 263265,
+            RaidIcon = { { npcID = 263265 } },
             Zone = 2512,
             _index = 5,
         },
@@ -1596,7 +1618,7 @@ APR.RouteQuestStepList["2512-Midnight-Treasures-Coiled-Isle"] = {
             Achievement = { achievementID = 63359, criteriaID = 115297, criteriaIndex = 22 },
             Coord = { x = -10904.3, y = 7151.8 },
             Range = 1,
-            RaidIcon = 261142,
+            RaidIcon = { { npcID = 261142 } },
             Zone = 2512,
             _index = 12,
         },
@@ -1604,7 +1626,7 @@ APR.RouteQuestStepList["2512-Midnight-Treasures-Coiled-Isle"] = {
             LootItems = { { itemID = 271424, quantity = 3, questID = 95907 } },
             Coord = { x = -12677.4, y = 8273.7 },
             Range = 30,
-            RaidIcon = 263081,
+            RaidIcon = { { npcID = 263081 } },
             Zone = 2512,
             _index = 13,
         },
@@ -1654,18 +1676,21 @@ APR.RouteQuestStepList["2512-Midnight-Treasures-Coiled-Isle"] = {
         {
             GossipOptionIDs = { 139428 },
             Coord = { x = -12961.5, y = 5718.9 },
+            IsQuestUncompleted = 95956,
             Zone = 2512,
             _index = 20,
         },
         {
             GossipOptionIDs = { 139430 },
             Coord = { x = -13073.8, y = 5408.3 },
+            IsQuestUncompleted = 95956,
             Zone = 2512,
             _index = 21,
         },
         {
             GossipOptionIDs = { 139431 },
             Coord = { x = -12746.7, y = 5470.5 },
+            IsQuestUncompleted = 95956,
             Zone = 2512,
             _index = 22,
         },
@@ -1692,30 +1717,30 @@ APR.RouteQuestStepList["2512-Midnight-Treasures-Coiled-Isle"] = {
         },
         {
             LootItems = { { itemID = 265525, quantity = 1, questID = 94569 } },
-            Note = { "AmaniPrivateerCache", "AmaniPrivateerCachewarning" },
+            Note = { "AMANI_PRIVATEER_CACHE", "AMANI_PRIVATEER_CACHE_WARNING" },
             Coord = { x = -13330.6, y = 4992.7 },
             SpellButton = { ["94569"] = 76271 },
             Zone = 2512,
             _index = 26,
         },
         {
-            Note = { "AmaniPrivateerCache", "AmaniPrivateerCachewarning" },
+            Note = { "AMANI_PRIVATEER_CACHE", "AMANI_PRIVATEER_CACHE_WARNING" },
             Coord = { x = -13331.7, y = 4993.5 },
-            Buffs = { { spellId = 1275730, tooltipMessage = "AmaniPrivateerCache" } },
-            RaidIcon = 258076,
+            Buffs = { { spellId = 1275730, tooltipMessage = "AMANI_PRIVATEER_CACHE" } },
+            RaidIcon = { { npcID = 258076 } },
             Zone = 2512,
             _index = 27,
         },
         {
             LootItems = { { itemID = 265610, quantity = 1, questID = 94569 } },
-            Note = { "AmaniPrivateerCache", "AmaniPrivateerCachewarning" },
+            Note = { "AMANI_PRIVATEER_CACHE", "AMANI_PRIVATEER_CACHE_WARNING" },
             Coord = { x = -13293.1, y = 4937.4 },
             Zone = 2512,
             _index = 28,
         },
         {
             LootItems = { { itemID = 265603, quantity = 1, questID = 94569 } },
-            Note = { "AmaniPrivateerCache", "AmaniPrivateerCachewarning" },
+            Note = { "AMANI_PRIVATEER_CACHE", "AMANI_PRIVATEER_CACHE_WARNING" },
             Coord = { x = -13238, y = 4862.6 },
             Zone = 2512,
             _index = 29,
@@ -1792,6 +1817,7 @@ APR.RouteQuestStepList["2512-Midnight-Treasures-Coiled-Isle"] = {
         {
             GossipOptionIDs = { 139164 },
             Coord = { x = -12879.8, y = 4997.6 },
+            IsQuestUncompleted = 95571,
             Zone = 2512,
             _index = 40,
         },
@@ -1997,6 +2023,6 @@ APR.RouteQuestStepList["2512-Midnight-Student-of-Hissstory"] = {
             _index = 20,
         },
 
-        { RouteCompleted = true, _index = 12 },
+        { RouteCompleted = true, _index = 21 },
     },
 }

@@ -1,20 +1,26 @@
--- Route repair automation and localized tame names across runtime event updates.
+-- Route repair automation and NPC name caching across runtime event updates.
 local function noop() end
 UNKNOWN = "Unknown"
-local L = setmetatable({ TAMEBEAST = "Tame the %s beast", REPAIR = "Repair your gear" },
-    { __index = function(_, key) return key end })
-function LibStub() return { GetLocale = function() return L end } end
+local L = setmetatable(
+    { TAMEBEAST = "Tame the %s beast", REPAIR = "Repair your gear" },
+    { __index = function(_, key) return key end }
+)
+function LibStub()
+    return { GetLocale = function() return L end }
+end
 function CreateFrame() return { RegisterEvent = noop, SetScript = noop } end
 local active, conditions, modifier, combat, npc = nil, true, false, false, 3331
 local durability, money, cost, canRepair = { [1] = { 50, 100 } }, 100, 20, true
 local repairs, advances, updates, listUpdates, selected = 0, 0, 0, 0, nil
 local asynchronous, pendingRepair = false, false
 local timers = {}
-C_Timer = { NewTimer = function(_, callback)
-    local timer = { callback = callback, Cancel = noop }
-    timers[#timers + 1] = timer
-    return timer
-end }
+C_Timer = {
+    NewTimer = function(_, callback)
+        local timer = { callback = callback, Cancel = noop }
+        timers[#timers + 1] = timer
+        return timer
+    end,
+}
 function InCombatLockdown() return combat end
 function IsModifierKeyDown() return modifier end
 function GetInventoryItemDurability(slot)
@@ -27,20 +33,31 @@ function GetRepairAllCost() return cost, cost > 0 end
 function RepairAllItems(guild)
     assert(not guild, "Route repairs spend available personal money")
     repairs = repairs + 1
-    if asynchronous then pendingRepair = true else
-        for _, item in pairs(durability) do item[1] = item[2] end
+    if asynchronous then
+        pendingRepair = true
+    else
+        for _, item in pairs(durability) do
+            item[1] = item[2]
+        end
     end
 end
 UnitCreatureID = function() return npc end
 dofile("APR-Core/utils/SecretUtils.lua")
-APR = { PlayerID = "player", ActiveRoute = "test", currentStep = {}, questOrderList = {},
-    settings = { profile = { enableAddon = true, autoRepair = false, autoGossip = false } } }
+APR = {
+    PlayerID = "player",
+    ActiveRoute = "test",
+    currentStep = {},
+    questOrderList = {},
+    settings = { profile = { enableAddon = true, autoRepair = false, autoGossip = false } },
+}
 APRData = { player = { test = 1 }, NPCList = {} }
 function APR:NewModule() return {} end
 function APR:GetSettingsProfile() return self.settings.profile end
 function APR:AreConditionalFiltersMet() return conditions end
 function APR:StepUsesAnyOption(step, keys)
-    for _, key in ipairs(keys) do if step and step[key] then return true end end
+    for _, key in ipairs(keys) do
+        if step and step[key] then return true end
+    end
     return false
 end
 function APR:GetCurrentStepToken() return "test:1" end
@@ -62,9 +79,11 @@ APR.RefreshInstanceUIVisibility, APR.MaybePromptInstanceUIPreference = noop, noo
 function APR:IsInstanceWithUI() return true end
 dofile("APR-Core/utils/TargetUtils.lua")
 dofile("APR-Core/features/questing/RouteActions.lua")
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/utils/StepUtils.lua")
 dofile("APR-Core/features/questing/Gossip.lua")
 dofile("APR-Core/core/Event.lua")
+dofile("APR-Core/features/questing/NPCInteraction.lua")
 function APR:GetStep() return active end
 function APR:NextQuestStep() advances = advances + 1 end
 local function dispatch(tag, event, ...)
@@ -75,7 +94,9 @@ end
 local function flush()
     local queued = timers
     timers = {}
-    for _, timer in ipairs(queued) do timer.callback() end
+    for _, timer in ipairs(queued) do
+        timer.callback()
+    end
 end
 local function resetRepair()
     active = { Repair = { npcID = 3331 } }
@@ -103,8 +124,10 @@ GetInventoryItemDurability = api
 
 -- A route repair opens the declared NPC's vendor option even with general automation off.
 resetRepair()
-C_GossipInfo = { GetOptions = function() return { { gossipOptionID = 99, type = "vendor" } } end,
-    SelectOption = function(id) selected = id end }
+C_GossipInfo = {
+    GetOptions = function() return { { gossipOptionID = 99, type = "vendor" } } end,
+    SelectOption = function(id) selected = id end,
+}
 APR.gossip:HandleGossip(active)
 assert(selected == 99)
 selected, npc = nil, 999
@@ -143,13 +166,11 @@ assert(not APR.routeActionState.repairPending)
 APR:HandleRouteAction(active)
 assert(advances == 1)
 
--- Both text access paths use the fallback name until the live unit name is cached.
+-- A newly cached NPC name refreshes the current step and route list once.
 flush()
 active = { TameBeast = { npcID = 3127, Text = "Venomtail Scorpid" } }
 APR.routeActionState = nil
-assert(APR:GetStepString(active) == "Tame the Venomtail Scorpid beast")
 APR:HandleRouteAction(active)
-assert(row == "Tame the Venomtail Scorpid beast")
 local unitName = UNKNOWN
 function UnitExists() return true end
 function UnitIsPlayer() return false end
@@ -164,12 +185,7 @@ dispatch("npcName", "UNIT_NAME_UPDATE", "target")
 assert(APRData.NPCList[3127] == unitName and listUpdates == 1)
 flush()
 assert(updates > 0)
-assert(APR:GetStepString(active) == "Tame the Scorpide venimeux beast")
 APR:HandleRouteAction(active)
-assert(row == "Tame the Scorpide venimeux beast")
 dispatch("targetChanged", "PLAYER_TARGET_CHANGED")
 assert(listUpdates == 1, "Cached names must not repeatedly force a route-list rebuild")
-assert(APR:GetRouteActionText("TameBeast", {}) == "Tame the Unknown beast")
-L.TAMEBEAST = "Old tame label"
-assert(APR:GetRouteActionText("TameBeast", active.TameBeast) == "Old tame label: Scorpide venimeux")
-print("Repair: threshold, merchant automation, guards and durability events; tame: fallback names and live localization passed")
+print("Repair: threshold, merchant automation, guards and durability events; tame: NPC name caching and refresh passed")

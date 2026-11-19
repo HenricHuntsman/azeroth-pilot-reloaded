@@ -35,39 +35,49 @@ function APR:RegisterFontString() registrations = registrations + 1 end
 function APR:SetFontStringRole(font, role) font.role = role end
 
 GameTooltip = { GetOwner = noop, Hide = noop }
-dofile("APR-Core/utils/QuestOrderListUtils.lua")
-local utils = APR.questOrderListUtils
+dofile("APR-Core/ui/route/QuestOrderListSupport.lua")
+local utils = APR.questOrderListSupport
 local rows = {}
-for pass = 1, 30 do
-    local layout = { scrollChild = {}, frameWidth = 258, dataHeight = 0 }
-    for i = 1, 1000 do
-        rows[i] = utils:AddStepFrameWithQuest(layout, i, "Quest", {
-            { questID = 1 }, { questID = 2 }, { questID = 3 },
-        }, "gray", false)
-    end
-    for _, row in ipairs(rows) do utils:ReleaseStepFrame(row) end
+for i = 1, 10 do
+    rows[i] = CreateFrame("Frame")
 end
-assert(frames == 1000 and fonts == 5000 and registrations == 5000,
-    "Thirty redraws must reuse frames and fonts after the first render")
-local row = utils:AddStepFrameWithQuest({ scrollChild = {}, frameWidth = 258, dataHeight = 0 },
-    1, "Completed", {}, "green", false)
+for pass = 1, 30 do
+    local layout = { scrollChild = {}, frameWidth = 258, dataHeight = 0, collectModels = true }
+    for i = 1, 1000 do
+        local model = utils:AddStepFrameWithQuest(layout, i, "Quest", {
+            { questID = 1 },
+            { questID = 2 },
+            { questID = 3 },
+        }, "gray", false)
+        assert(model.isModel and model.height == 30)
+        utils:BindStepModel(rows[(i - 1) % 10 + 1], model, {})
+    end
+end
+assert(
+    frames == 12 and fonts == 55 and registrations == 55,
+    "30000 models reuse ten viewport rows and one hidden measurement row"
+)
+local row = rows[1]
+local layout = { scrollChild = {}, frameWidth = 258, dataHeight = 0, collectModels = true }
+local completed = utils:AddStepFrame(layout, 1, "Completed", "green", false)
+utils:BindStepModel(row, completed, {})
 assert(row.scripts.OnEnter == nil and row.scripts.OnLeave == nil, "A reused completed row has no stale tooltip")
-assert(#row.questFonts == 0 and row.questFontPool[1].hidden, "Old quest detail lines are hidden")
-assert(row.titleFont.text == "Completed" and row.titleFont.role == "success", "Reused text and color are updated")
-local progressedRow = utils:AddStepFrameWithQuest({ scrollChild = {}, frameWidth = 258, dataHeight = 0 },
-    2, "Loot", { { questID = 5, questName = "Fragments" } }, "gray", true)
-utils:SetStepFrameState(progressedRow, "gray", true)
-assert(progressedRow.titleFont.role == "warning" and progressedRow.questFonts[1].role == "base",
-    "The active row can be highlighted without rebuilding it")
-utils:SetStepFrameState(progressedRow, "green", false)
-assert(progressedRow.titleFont.role == "success" and progressedRow.questFonts[1].role == "muted",
-    "A progressed row can be completed in place")
-assert(utils:CollapseStepDetails(progressedRow) and #progressedRow.questFonts == 0,
-    "Completed loot details collapse without recreating the row")
-print("Quest list: 30 x 1000 rows; only 1000 frames / 5000 fonts allocated")
+assert(#row.questFonts == 0 and row.questFontPool[1].hidden, "Old quest details are hidden")
+assert(row.titleFont.text == "Completed" and row.titleFont.role == "success")
+local progressed =
+    utils:AddStepFrameWithQuest(layout, 2, "Loot", { { questID = 5, questName = "Fragments" } }, "gray", true)
+utils:BindStepModel(row, progressed, {})
+utils:SetStepFrameState(progressed, "gray", true)
+assert(row.titleFont.role == "activeStep" and row.questFonts[1].role == "base")
+utils:SetStepFrameState(progressed, "green", false)
+assert(row.titleFont.role == "success" and row.questFonts[1].role == "muted")
+assert(utils:CollapseStepDetails(progressed) and #progressed.questInfo == 0 and #row.questFonts == 0)
+print("Quest list: 30 x 1000 models; twelve frames and 55 fonts allocated")
 
 -- Profiling is opt-in and retains at most 100 slow records in SavedVariables.
-function LibStub() return { GetLocale = function() return {} end } end
+function LibStub()
+    return { GetLocale = function() return {} end }
+end
 
 function APR:NewModule() return {} end
 
@@ -75,6 +85,7 @@ local now = 0
 function debugprofilestop() return now end
 
 APRData = { test = { ["long-route"] = 17 }, PerformanceLog = { summary = {}, slow = {} } }
+dofile("APR-Core/core/Performance.lua")
 dofile("APR-Core/core/Commands.lua")
 assert(APR:StartPerformanceSample() == nil, "Profiling is disabled by default")
 APR.performanceLogging = true
@@ -83,8 +94,10 @@ for i = 1, 200 do
     now = now + 11
     APR:FinishPerformanceSample("Render", start, 1000)
 end
-assert(#APRData.PerformanceLog.slow == 100 and APRData.PerformanceLog.summary.Render.count == 200,
-    "Performance logs are bounded while summary counts remain complete")
+assert(
+    #APRData.PerformanceLog.slow == 100 and APRData.PerformanceLog.summary.Render.count == 200,
+    "Performance logs are bounded while summary counts remain complete"
+)
 assert(APRData.PerformanceLog.summary.Render.totalMs == 2200, "Recorded durations are accumulated correctly")
 print("Performance capture: disabled by default; slow-record ring bounded to 100 entries")
 
@@ -108,17 +121,48 @@ while owner.renderFrame.scripts.OnUpdate do
 end
 assert(rendered == 1224 and completed and batches > 1, "Every row is eventually rendered")
 assert(owner.renderFrame.hidden, "An idle renderer performs no per-frame work")
-utils:StartRender(owner, function() error("Stale route must never render") end,
-    function() return false end, noop)
+utils:StartRender(owner, function() error("Stale route must never render") end, function() return false end, noop)
 owner.renderFrame.scripts.OnUpdate()
 assert(owner.renderFrame.scripts.OnUpdate == nil, "A stale route cancels the renderer")
-utils:StartRender(owner, function() error("Replaced worker must never render") end,
-    function() return true end, noop)
+utils:StartRender(owner, function() error("Replaced worker must never render") end, function() return true end, noop)
 local replacementRan = false
 utils:StartRender(owner, function() replacementRan = true end, function() return true end, noop)
 owner.renderFrame.scripts.OnUpdate()
 assert(replacementRan, "A new render replaces the pending worker")
 print("Quest list scheduling: all 1224 rows rendered in bounded batches; stale/replaced work cancelled")
+
+-- Completing preparation at the budget boundary leaves publication a fresh frame.
+local prepared, published, valid = 0, 0, true
+local function prepare()
+    prepared = prepared + 1
+    now = now + 3
+end
+local function publish(finished)
+    if finished then
+        published = published + 1
+        now = now + 2
+    end
+end
+utils:StartRender(owner, prepare, function() return valid end, publish)
+local before = now
+owner.renderFrame.scripts.OnUpdate()
+assert(
+    now - before == 3 and prepared == 1 and published == 0,
+    "An exhausted preparation budget cannot also bind the viewport"
+)
+owner.renderFrame.scripts.OnUpdate()
+assert(
+    prepared == 1 and published == 1 and not owner.renderFrame.scripts.OnUpdate,
+    "Deferred publication runs once without repeating preparation"
+)
+utils:StartRender(owner, prepare, function() return valid end, publish)
+owner.renderFrame.scripts.OnUpdate()
+valid = false
+owner.renderFrame.scripts.OnUpdate()
+assert(
+    prepared == 2 and published == 1 and not owner.renderFrame.scripts.OnUpdate,
+    "Route replacement cancels completed but unpublished work"
+)
 
 -- Reputation refreshes only need a full redraw when a displayed threshold changes.
 local reachedReputations = {}
@@ -132,20 +176,60 @@ local reputationSteps = {
 }
 local initialReputationState = utils:GetReputationStateSignature(reputationSteps)
 assert(initialReputationState ~= "", "Routes with reputation thresholds expose a state signature")
-assert(initialReputationState == utils:GetReputationStateSignature(reputationSteps),
-    "Unchanged reputation progress keeps a stable signature")
+assert(
+    initialReputationState == utils:GetReputationStateSignature(reputationSteps),
+    "Unchanged reputation progress keeps a stable signature"
+)
 reachedReputations[2] = true
-assert(initialReputationState ~= utils:GetReputationStateSignature(reputationSteps),
-    "Crossing a nested reputation threshold changes the signature")
+assert(
+    initialReputationState ~= utils:GetReputationStateSignature(reputationSteps),
+    "Crossing a nested reputation threshold changes the signature"
+)
+
+-- Deep condition trees are also split into frames, not just the outer route loop.
+local nested = { AllOf = {} }
+for index = 1, 1200 do
+    nested.AllOf[index] = { Reputation = { factionID = index, level = 1 } }
+end
+local expectedSignature = utils:GetReputationStateSignature({ nested })
+local originalReached = APR.IsReputationLevelReached
+local reputationReads, preparedSignature = 0, nil
+function APR:IsReputationLevelReached(requirement)
+    reputationReads = reputationReads + 1
+    now = now + 1
+    return originalReached(self, requirement)
+end
+utils:StartRender(
+    owner,
+    function()
+        preparedSignature = utils:GetReputationStateSignature({ nested }, coroutine.yield)
+    end,
+    function() return true end,
+    noop
+)
+assert(reputationReads == 0)
+while owner.renderFrame.scripts.OnUpdate do
+    local before = reputationReads
+    owner.renderFrame.scripts.OnUpdate()
+    assert(reputationReads - before <= 3, "Nested reputation checks respect the batch budget")
+end
+assert(
+    reputationReads == 1200 and preparedSignature == expectedSignature,
+    "Budgeted reputation preparation preserves the complete threshold signature"
+)
+APR.IsReputationLevelReached = originalReached
 
 local timers, totals, updates, renders = {}, 0, 0, 0
 C_Timer = {
     NewTimer = function(_, callback)
         timers[#timers + 1] = callback
         return { Cancel = noop }
-    end
+    end,
 }
-function APR:GetTotalSteps() totals = totals + 1 end
+function APR:GetTotalSteps()
+    totals = totals + 1
+    return 2
+end
 
 function APR:UpdateStep() updates = updates + 1 end
 
@@ -160,28 +244,54 @@ APR.questOrderList = {
         renders = renders + 1
     end,
 }
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/core/Event.lua")
-for _ = 1, 100 do APR.event.functions.reputation() end
+dofile("APR-Core/features/questing/NPCInteraction.lua")
+for _ = 1, 100 do
+    APR.event.functions.reputation()
+end
 assert(#timers == 1 and totals == 0, "A reputation burst schedules a single refresh")
 timers[1]()
-assert(totals == 1 and updates == 1 and renders == 0,
-    "Unchanged reputation state does not rebuild the Quest Order List")
+assert(totals == 0 and updates == 0, "The event timer only schedules budgeted reputation work")
+while APR.event.reputationJob.renderFrame.scripts.OnUpdate do
+    APR.event.reputationJob.renderFrame.scripts.OnUpdate()
+end
+assert(updates == 0, "The step rebuild does not share the final scan batch")
+timers[2]()
+assert(
+    totals == 1 and updates == 1 and renders == 0,
+    "Unchanged reputation state does not rebuild the Quest Order List"
+)
 reachedReputations[1] = true
 APR.event.functions.reputation()
-assert(#timers == 2, "Later reputation changes are not lost")
-timers[2]()
-assert(totals == 2 and updates == 2 and renders == 1,
-    "Crossing a route reputation threshold forces exactly one list rebuild")
+assert(#timers == 3, "Later reputation changes are not lost")
+timers[3]()
+while APR.event.reputationJob.renderFrame.scripts.OnUpdate do
+    APR.event.reputationJob.renderFrame.scripts.OnUpdate()
+end
+timers[4]()
+assert(
+    totals == 2 and updates == 2 and renders == 1,
+    "Crossing a route reputation threshold forces exactly one list rebuild"
+)
 print("Reputation refresh: event bursts coalesced; list rebuilt only on a route threshold change")
 
 -- Banked, already-complete delve objectives must not rebuild the current step on every log event.
 dofile("APR-Core/utils/QuestUtils.lua")
+dofile("APR-Core/features/questing/StepInstructions.lua")
+dofile("APR-Core/features/questing/StepQuestHandlers.lua")
+dofile("APR-Core/features/questing/StepTravelHandlers.lua")
+dofile("APR-Core/features/questing/StepActionHandlers.lua")
+dofile("APR-Core/features/questing/StepRenderer.lua")
+dofile("APR-Core/features/questing/QuestCache.lua")
 dofile("APR-Core/features/questing/QuestHandler.lua")
 APR.QUEST_STATUS = { COMPLETE = "complete", PROGRESS = "progress" }
 APR.ActiveQuests = {
     [93427] = {
-        status = "complete", title = "Banked reward", objectives = { { text = "Done", status = "complete" } },
-    }
+        status = "complete",
+        title = "Banked reward",
+        objectives = { { text = "Done", status = "complete" } },
+    },
 }
 local objectiveText = "Done"
 C_QuestLog = {
@@ -199,7 +309,9 @@ APR.Debug, APR.UpdateQpartPart = noop, noop
 updates = 0
 function APR:UpdateStep() updates = updates + 1 end
 
-for _ = 1, 100 do APR:UpdateQuest() end
+for _ = 1, 100 do
+    APR:UpdateQuest()
+end
 assert(updates == 0, "An unchanged banked reward cannot force repeated step rebuilds")
 objectiveText = "Changed"
 APR:UpdateQuest()

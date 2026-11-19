@@ -1,0 +1,417 @@
+-- Project endpoints into world coordinates and identify their access regions.
+-- A shared position alone does not permit walking through a required entrance.
+local Lib = LibStub("LibAPRNavigation-1.0")
+if not Lib:BeginModule("geography", 16) then return end
+local Instance = Lib.Instance
+-- These defaults are read-only, including CheckRequirements' character input.
+-- Reuse them across walking checks and retries of unavailable map ancestry.
+local EMPTY = {}
+
+local function Finite(value)
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+function Instance:GetMapAncestryInfo(mapID)
+    if not mapID then return nil end
+    self.mapInfos = self.mapInfos or {}
+    local cached = self.mapInfos[mapID]
+    if cached then return cached end
+    local info = self.env.getMapInfo and self.env.getMapInfo(mapID)
+    local fallback = self.config.UnmappedAreas and self.config.UnmappedAreas[mapID]
+    if not info and fallback then
+        -- Legacy guide map identities can outlive their native UI maps. They
+        -- describe one verified world interior, never a map projection.
+        info = { mapID = mapID, parentMapID = 0, mapType = 5 }
+    end
+    -- Map ancestry is static within a client session. Missing records during
+    -- loading must remain retryable; InvalidatePositionCache clears successes.
+    if info and type(info.mapType) == "number" and type(info.parentMapID) == "number" then
+        self.mapInfos[mapID] = info
+    end
+    return info
+end
+
+function Instance:GetWorldInstanceID(instanceID)
+    local overrides = self.config.WorldInstanceOverrides
+    return (overrides and overrides[instanceID]) or instanceID
+end
+
+function Instance:GetFallbackMapForInstance(instanceID)
+    for mapID, area in pairs(self.config.UnmappedAreas or EMPTY) do
+        if self:GetWorldInstanceID(area.instanceID) == self:GetWorldInstanceID(instanceID) then return mapID end
+    end
+end
+
+function Instance:GetMapWorldInstanceID(mapID)
+    local fallback = self.config.UnmappedAreas and self.config.UnmappedAreas[mapID]
+    if fallback then return self:GetWorldInstanceID(fallback.instanceID) end
+    if self.env.mapToWorld then
+        local instanceID = self.env.mapToWorld(mapID, 0.5, 0.5)
+        return self:GetWorldInstanceID(instanceID)
+    end
+end
+
+function Instance:GetUnmappedInstanceRegion(instanceID)
+    instanceID = self:GetWorldInstanceID(instanceID)
+    if
+        Finite(instanceID)
+        and (
+            (self.config.UnmappedInstances and self.config.UnmappedInstances[instanceID])
+            or (self.entranceInstances and self.entranceInstances[instanceID])
+        )
+    then
+        return tostring(instanceID) .. ":instance:" .. tostring(instanceID) .. ":interior"
+    end
+end
+
+local function WorldRegion(region, source, target)
+    if type(region) == "string" and source ~= nil and source ~= target then
+        local prefix = tostring(source) .. ":"
+        if region:sub(1, #prefix) == prefix then return tostring(target) .. ":" .. region:sub(#prefix + 1) end
+    end
+    -- Explicit regions supplied by the host are access boundaries, not caches.
+    return region
+end
+
+-- Only explicitly declared projection points may lie beyond a map's artwork.
+-- Three valid samples retain the client's affine transform without passing
+-- out-of-range coordinates to its map API.
+function Instance:ProjectExtendedMap(mapID, x, y)
+    if not self.env.mapToWorld then return end
+    local world, ox, oy = self.env.mapToWorld(mapID, 0, 0)
+    local worldX, xx, xy = self.env.mapToWorld(mapID, 1, 0)
+    local worldY, yx, yy = self.env.mapToWorld(mapID, 0, 1)
+    if
+        world == nil
+        or world ~= worldX
+        or world ~= worldY
+        or not Finite(ox)
+        or not Finite(oy)
+        or not Finite(xx)
+        or not Finite(xy)
+        or not Finite(yx)
+        or not Finite(yy)
+    then
+        return
+    end
+    return world, ox + x * (xx - ox) + y * (yx - ox), oy + x * (xy - oy) + y * (yy - oy)
+end
+
+function Instance:GetRemappedMapID(mapID, instanceID, x, y)
+    for _, rect in ipairs((self.config.MapRemaps or EMPTY)[mapID] or EMPTY) do
+        if
+            instanceID == rect.instanceID
+            and x >= rect.minX
+            and x <= rect.maxX
+            and y >= rect.minY
+            and y <= rect.maxY
+        then
+            return rect.mapID
+        end
+    end
+    return mapID
+end
+
+local function InPolygon(x, y, vertices)
+    local inside, previous = false, vertices[#vertices]
+    for _, current in ipairs(vertices) do
+        local ax, ay, bx, by = previous.x, previous.y, current.x, current.y
+        local cross = (x - ax) * (by - ay) - (y - ay) * (bx - ax)
+        if
+            math.abs(cross) < 0.000001
+            and x >= math.min(ax, bx)
+            and x <= math.max(ax, bx)
+            and y >= math.min(ay, by)
+            and y <= math.max(ay, by)
+        then
+            return true
+        end
+        if (ay > y) ~= (by > y) and x < (bx - ax) * (y - ay) / (by - ay) + ax then inside = not inside end
+        previous = current
+    end
+    return inside
+end
+
+function Instance:GetLocationAccessKey(position)
+    if position.accessKey then return position.accessKey end
+    local regions = (self.config.LocalRegions or EMPTY)[position.uiMapID]
+    if not regions then return end
+    self.localRegionGeometry = self.localRegionGeometry or {}
+    for _, region in ipairs(regions) do
+        local geometry = self.localRegionGeometry[region]
+        if not geometry and self.env.mapToWorld and (region.center or region.polygon) then
+            geometry = { vertices = {} }
+            for _, point in ipairs(region.polygon or { region.center }) do
+                local world, x, y = self.env.mapToWorld(position.uiMapID, point[1], point[2])
+                if
+                    world == nil
+                    or not Finite(x)
+                    or not Finite(y)
+                    or (geometry.instanceID ~= nil and geometry.instanceID ~= world)
+                then
+                    geometry = nil
+                    break
+                end
+                geometry.instanceID = world
+                geometry.vertices[#geometry.vertices + 1] = { x = x, y = y }
+            end
+            if geometry then self.localRegionGeometry[region] = geometry end
+        end
+        if
+            geometry
+            and self:GetWorldInstanceID(geometry.instanceID) == self:GetWorldInstanceID(position.instanceID)
+        then
+            if region.radius then
+                local center = geometry.vertices[1]
+                if (position.x - center.x) ^ 2 + (position.y - center.y) ^ 2 <= region.radius ^ 2 then
+                    return region.key
+                end
+            elseif #geometry.vertices >= 3 and InPolygon(position.x, position.y, geometry.vertices) then
+                return region.key
+            end
+        end
+    end
+end
+
+function Instance:NormalizeLocation(location, hint)
+    if type(location) ~= "table" then return nil end
+    local x, y = location.x, location.y
+    local instanceID, mapID = self:GetWorldInstanceID(location.instanceID), location.uiMapID
+    if not Finite(x) or not Finite(y) then return nil end
+    if location.space == "map" then
+        if not self.env.mapToWorld or not mapID or x < 0 or x > 1 or y < 0 or y > 1 then return nil end
+        instanceID, x, y = self.env.mapToWorld(mapID, x, y)
+    elseif location.space == "mapProjection" then
+        instanceID, x, y = self:ProjectExtendedMap(mapID, x, y)
+    elseif instanceID == nil and mapID then
+        -- A recorded world point may omit its instance ID. Resolve its client
+        -- or declared interior space without replacing the observed X/Y.
+        instanceID = self:GetMapWorldInstanceID(mapID)
+    elseif not mapID and instanceID ~= nil then
+        mapID = self:GetFallbackMapForInstance(instanceID)
+        if
+            not mapID
+            and not (self.config.UnmappedInstances and self.config.UnmappedInstances[instanceID])
+            and self.env.worldToMap
+        then
+            mapID = self.env.worldToMap(instanceID, x, y, hint)
+        end
+    end
+    instanceID = self:GetWorldInstanceID(instanceID)
+    if not Finite(instanceID) or not Finite(x) or not Finite(y) then return nil end
+    mapID = self:GetRemappedMapID(mapID, instanceID, x, y)
+    local position = {
+        instanceID = instanceID,
+        uiMapID = mapID,
+        x = x,
+        y = y,
+        z = location.z,
+        floor = location.floor,
+        areaID = location.areaID
+            or (
+                self.config.UnmappedAreas
+                and self.config.UnmappedAreas[mapID]
+                and self.config.UnmappedAreas[mapID].areaID
+            ),
+        nameGlobal = location.nameGlobal,
+        accessKey = location.accessKey,
+        noAutoconnect = location.noAutoconnect,
+        phaseAgnostic = location.phaseAgnostic,
+        isInstance = location.isInstance,
+        region = WorldRegion(location.region, location.instanceID, instanceID),
+    }
+    position.accessKey = self:GetLocationAccessKey(position)
+    position.region = self:GetPositionRegion(position)
+    return position
+end
+
+function Instance:GetPositionRegion(position)
+    if not position then return nil end
+    local instanceID = self:GetWorldInstanceID(position.instanceID)
+    if position.region then return WorldRegion(position.region, position.instanceID, instanceID) end
+    local mapID = position.uiMapID
+    if not mapID and position.instanceID ~= nil then
+        mapID = self:GetFallbackMapForInstance(instanceID)
+        if not mapID and self.config.UnmappedInstances and self.config.UnmappedInstances[instanceID] then
+            local region = self:GetUnmappedInstanceRegion(instanceID)
+            if region then return region end
+        end
+        if not mapID and self.env.worldToMap then mapID = self.env.worldToMap(instanceID, position.x, position.y) end
+    end
+    if not mapID then return self:GetUnmappedInstanceRegion(instanceID) end
+    self.regions = self.regions or {}
+    local cacheKey = tostring(instanceID) .. ":" .. mapID .. ":" .. tostring(position.isInstance == true)
+    local cached = self.regions[cacheKey]
+    if cached then return cached end
+
+    local config = self.config
+    local isolatedAreas = config.IsolatedAreas or EMPTY
+    local mapTypeOverrides = config.MapTypeOverrides or EMPTY
+    local continentOverrides = config.ContinentMapOverrides or EMPTY
+    local isolatedContinents = config.IsolatedContinents or EMPTY
+    local current, outer, outerType = mapID, mapID, nil
+    local seen, isolation = {}, nil
+    -- The nearest isolated ancestor wins. Two points can share world
+    -- coordinates while still requiring a portal or an instance entrance.
+    for _ = 1, 50 do
+        if not current or current == 0 or seen[current] then return nil end
+        seen[current] = true
+        local info = self:GetMapAncestryInfo(current)
+        if not info then return nil end
+        if isolation == nil then isolation = isolatedAreas[current] end
+        local override = mapTypeOverrides[current]
+        local mapType = override and override.mapType or info.mapType
+        local continent = continentOverrides[current]
+        local region
+        if mapType == 2 or continent then
+            if isolatedContinents[current] and isolation == nil then
+                isolation = "area:" .. outer
+            end
+            region = tostring(instanceID)
+                .. ":"
+                .. tostring(continent or current)
+                .. ":"
+                .. tostring(isolation or "outdoor")
+        elseif mapType == 4 or (self.entranceMaps and self.entranceMaps[current]) then
+            -- Native interior maps remain isolated even when the host has no
+            -- IsInInstance observation (for example an authored destination).
+            -- All verified floors of one instance share its explicit identity.
+            local entrances = self.entranceMaps and self.entranceMaps[current]
+            local identity = entrances and entrances[1].interiorMapIDs[1] or current
+            region = tostring(instanceID) .. ":instance:" .. identity .. ":" .. tostring(isolation or "interior")
+        elseif mapType == 6 or (info.parentMapID == 0 and (mapType == 3 or mapType == 5)) then
+            -- Native Orphan maps are their own walking roots, even with a UI
+            -- parent. Standalone zones/micro maps likewise bound local access,
+            -- including descendants, without connecting separate roots.
+            region = tostring(instanceID) .. ":map:" .. current .. ":" .. tostring(isolation or "outdoor")
+        elseif mapType == 0 or mapType == 1 then
+            -- A zone may sit directly under a Cosmic/World presentation map,
+            -- without a continent. Keep its outermost Zone/Micro as the local
+            -- walking root; the presentation parent cannot connect siblings.
+            if outerType ~= 3 and outerType ~= 5 then return nil end
+            region = tostring(instanceID) .. ":map:" .. outer .. ":" .. tostring(isolation or "outdoor")
+        end
+        if region then
+            self.regions[cacheKey] = region
+            return region
+        end
+        outer, outerType, current = current, mapType, info.parentMapID
+    end
+end
+
+function Instance:IsSameAccessRegion(from, to)
+    if not from or not to or self:GetWorldInstanceID(from.instanceID) ~= self:GetWorldInstanceID(to.instanceID) then
+        return false
+    end
+    if self:GetLocationAccessKey(from) ~= self:GetLocationAccessKey(to) or from.floor ~= to.floor then return false end
+    local source, target = self:GetPositionRegion(from), self:GetPositionRegion(to)
+    return source ~= nil and source == target
+end
+
+function Instance:CanWalk(from, to)
+    if not from or not to or from.noAutoconnect or to.noAutoconnect then return false end
+    if not to.phaseAgnostic and self.config.MapRequirements then
+        local requirements = self:GetMapAccessRequirements(to.uiMapID)
+        if requirements and self:CheckRequirements(requirements, EMPTY) ~= true then return false end
+    end
+    return self:IsSameAccessRegion(from, to)
+end
+
+function Instance:GetWalkingSpeed(position, travelSpeed, groundSpeed)
+    local mapID = position and position.uiMapID
+    if not mapID then return travelSpeed end
+    self.groundMaps = self.groundMaps or {}
+    local groundOnly = self.groundMaps[mapID]
+    if groundOnly == nil then
+        local current, restrictions = mapID, self.config.GroundOnlyAreas or EMPTY
+        for _ = 1, 50 do
+            if restrictions[current] then
+                groundOnly = true
+                break
+            end
+            local info = self:GetMapAncestryInfo(current)
+            if not info then return groundSpeed end -- Retry incomplete map data later.
+            current = info.parentMapID
+            if not current or current == 0 then
+                groundOnly = false
+                break
+            end
+        end
+        if groundOnly == nil then return groundSpeed end
+        self.groundMaps[mapID] = groundOnly
+    end
+    return groundOnly and math.min(travelSpeed, groundSpeed) or travelSpeed
+end
+
+-- Two stops can share one native interior map. Their public destination names
+-- belong to the served cities; this lookup never changes world/access data.
+function Instance:GetTransportDestinationName(kind, position)
+    local stops = self.config.TransportDestinations and self.config.TransportDestinations[kind]
+    if
+        not stops
+        or not position
+        or not Finite(position.instanceID)
+        or not Finite(position.x)
+        or not Finite(position.y)
+    then
+        return nil, false
+    end
+    local world, matched, interior = self:GetWorldInstanceID(position.instanceID), nil, false
+    for _, stop in ipairs(stops) do
+        if world == self:GetWorldInstanceID(stop.instanceID) then
+            interior = true
+            local dx, dy = position.x - stop.x, position.y - stop.y
+            if dx * dx + dy * dy <= stop.radius * stop.radius then
+                if matched and matched ~= stop.mapID then return nil, true end
+                matched = stop.mapID
+            end
+        end
+    end
+    local info = matched and self.env.getMapInfo and self.env.getMapInfo(matched)
+    local name = info and info.name
+    return type(name) == "string" and name ~= "" and name or nil, interior
+end
+
+function Instance:GetDisplayMapName(position)
+    -- Some interiors have a client GlobalString but no separate UI map.
+    -- Keep only its key in the catalogue and fall back to area/map names.
+    local name = position
+        and position.nameGlobal
+        and self.env.getGlobalText
+        and self.env.getGlobalText(position.nameGlobal)
+    if type(name) == "string" and name ~= "" then return name end
+    name = position and position.areaID and self.env.getAreaName and self.env.getAreaName(position.areaID)
+    if type(name) == "string" and name ~= "" then return name end
+    -- Names may become available after the map record itself. Read through the
+    -- environment; an edge build may memoize this answer for its own lifetime.
+    local info = position and position.uiMapID and self.env.getMapInfo and self.env.getMapInfo(position.uiMapID)
+    if info and type(info.name) == "string" and info.name ~= "" then return info.name end
+    return self:GetText("UNKNOWN", "UNKNOWN")
+end
+
+function Instance:ResolvePosition(definition, context)
+    if not definition then return nil end
+    if definition.dynamic then
+        local snapshot = self.dynamicPositions
+        if snapshot and snapshot[definition.dynamic] ~= nil then
+            return snapshot[definition.dynamic] or nil
+        end
+        local position
+        if definition.dynamic == "player" then
+            position = context.playerPosition or context.start
+        elseif self.env.getDynamicPosition then
+            position = self.env.getDynamicPosition(definition.dynamic)
+        end
+        position = position and self:NormalizeLocation(position) or nil
+        -- Only an edge builder supplies this cache. Ordinary API calls still
+        -- read the current bind, house or player position.
+        if snapshot then snapshot[definition.dynamic] = position or false end
+        return position
+    end
+    local cached = self.positions[definition]
+    if cached then return cached end
+    local position = self:NormalizeLocation(definition)
+    -- Failed lookups during loading are deliberately not cached.
+    if position and position.region then self.positions[definition] = position end
+    return position
+end

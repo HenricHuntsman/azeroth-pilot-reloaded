@@ -31,7 +31,7 @@ function APR:ScheduleDelveRouteRefresh() delveRefreshes = delveRefreshes + 1 end
 
 function APR:Debug() end
 
-APR.farstrider = {
+APR.navigation = {
     ForceRefresh = function() forceRefreshes = forceRefreshes + 1 end,
     GetMeToRightZone = function()
         routeCalls = routeCalls + 1
@@ -61,8 +61,11 @@ function debugprofilestop() return now end
 
 function IsInInstance() return false end
 
+dofile("APR-Core/core/Performance.lua")
 dofile("APR-Core/core/Commands.lua")
+dofile("APR-Core/features/questing/StepTransitions.lua")
 dofile("APR-Core/core/Event.lua")
+dofile("APR-Core/features/questing/NPCInteraction.lua")
 
 for index = 1, 100 do
     local event = index % 3 == 0 and "ZONE_CHANGED_NEW_AREA"
@@ -71,8 +74,7 @@ for index = 1, 100 do
     APR.event.functions.zone(event)
 end
 
-assert(routeCalls == 0 and forceRefreshes == 0,
-    "A zone-event burst must not calculate a route synchronously")
+assert(routeCalls == 0 and forceRefreshes == 0, "A zone-event burst must not calculate a route synchronously")
 
 local activeTimers = {}
 for _, timer in ipairs(timers) do
@@ -81,17 +83,21 @@ end
 assert(#activeTimers == 1, "One hundred zone events must coalesce into one routing timer")
 activeTimers[1].callback()
 
-assert(routeCalls == 1 and forceRefreshes == 1,
-    "The coalesced transition performs exactly one fresh routing calculation")
+assert(
+    routeCalls == 1 and forceRefreshes == 0,
+    "The coalesced transition checks current inputs once without discarding a valid route"
+)
 local summary = APRData.PerformanceLog.summary.ZoneTransitionRouting
-assert(summary and summary.count == 1 and summary.totalMs == 25 and summary.maxMs == 25,
-    "The delayed routing cost must be captured by /apr perf")
-assert(#APRData.PerformanceLog.slow == 1 and APRData.PerformanceLog.slow[1].name == "ZoneTransitionRouting",
-    "A slow zone calculation must appear in the bounded slow-operation log")
-assert(APRData.PerformanceLog.slow[1].step == 404,
-    "The slow-operation record must identify the active route step")
-assert(delveRefreshes == 100,
-    "Delve refreshes remain safe because their scheduler owns its own debounce timer")
+assert(
+    summary and summary.count == 1 and summary.totalMs == 25 and summary.maxMs == 25,
+    "The delayed routing cost must be captured by /apr perf"
+)
+assert(
+    #APRData.PerformanceLog.slow == 1 and APRData.PerformanceLog.slow[1].name == "ZoneTransitionRouting",
+    "A slow zone calculation must appear in the bounded slow-operation log"
+)
+assert(APRData.PerformanceLog.slow[1].step == 404, "The slow-operation record must identify the active route step")
+assert(delveRefreshes == 100, "Delve refreshes remain safe because their scheduler owns its own debounce timer")
 
 print("Zone transition: 100 events coalesced into 1 route calculation; 25 ms sample captured")
 
@@ -99,21 +105,26 @@ print("Zone transition: 100 events coalesced into 1 route calculation; 25 ms sam
 -- first pass confirms the route zone, the later timers must be cheap no-ops.
 timers, routeCalls, forceRefreshes = {}, 0, 0
 APR.IsInRouteZone = nil
-APR.farstrider.GetMeToRightZone = function()
+APR.navigation.GetMeToRightZone = function()
     routeCalls = routeCalls + 1
     now = now + 25
     APR.IsInRouteZone = true
 end
 
 APR.event.functions.zone("PLAYER_ENTERING_WORLD")
-assert(#timers == 4 and routeCalls == 0,
-    "Entering the world schedules bounded retries without routing synchronously")
-for _, timer in ipairs(timers) do timer.callback() end
-assert(routeCalls == 1 and forceRefreshes == 2,
-    "A successful first post-load route check skips the three remaining safety retries")
+assert(#timers == 4 and routeCalls == 0, "Entering the world schedules bounded retries without routing synchronously")
+for _, timer in ipairs(timers) do
+    timer.callback()
+end
+assert(
+    routeCalls == 1 and forceRefreshes == 2,
+    "A successful first post-load route check skips the three remaining safety retries"
+)
 summary = APRData.PerformanceLog.summary.ZoneTransitionRouting
-assert(summary.count == 2 and summary.totalMs == 50 and #APRData.PerformanceLog.slow == 2,
-    "Post-load routing contributes one measured sample")
+assert(
+    summary.count == 2 and summary.totalMs == 50 and #APRData.PerformanceLog.slow == 2,
+    "Post-load routing contributes one measured sample"
+)
 
 print("World transition: first successful route check skipped 3 redundant safety retries")
 
@@ -121,15 +132,34 @@ print("World transition: first successful route check skipped 3 redundant safety
 -- is still ahead. Safety retries must not repeatedly solve that same path.
 timers, routeCalls, forceRefreshes = {}, 0, 0
 APR.IsInRouteZone, navigating = nil, false
-APR.farstrider.GetMeToRightZone = function()
+APR.navigation.GetMeToRightZone = function()
     routeCalls = routeCalls + 1
     now = now + 25
     navigating = true
 end
 
 APR.event.functions.zone("PLAYER_ENTERING_WORLD")
-for _, timer in ipairs(timers) do timer.callback() end
-assert(routeCalls == 1 and forceRefreshes == 2,
-    "A valid navigation path skips the three remaining post-load retries")
+for _, timer in ipairs(timers) do
+    timer.callback()
+end
+assert(routeCalls == 1 and forceRefreshes == 2, "A valid navigation path skips the three remaining post-load retries")
 
 print("World transition: active navigation skipped 3 redundant path calculations")
+
+-- A cooperative search can legitimately span several post-load timers. They
+-- must not restart its completed work merely because guidance is not ready yet.
+timers, routeCalls, forceRefreshes = {}, 0, 0
+APR.IsInRouteZone, navigating, APR.navigation.search = nil, false, nil
+APR.navigation.GetMeToRightZone = function()
+    routeCalls = routeCalls + 1
+    APR.navigation.search = { status = "planning" }
+end
+APR.event.functions.zone("PLAYER_ENTERING_WORLD")
+for _, timer in ipairs(timers) do
+    timer.callback()
+end
+assert(
+    routeCalls == 1 and forceRefreshes == 2 and APR.navigation.search.status == "planning",
+    "Safety retries must leave an active post-load search running instead of rebuilding it"
+)
+print("World transition: an active cooperative search survives all later safety retries")

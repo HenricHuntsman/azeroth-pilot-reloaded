@@ -26,9 +26,9 @@ def examples():
          "InterfaceVersion InterfaceVersionExact HasAchievement DontHaveAchievement HasAura "
          "DontHaveAura HasSpell IsQuestOnQuest IsQuestNotOnQuest IsQuestCompleted IsQuestUncompleted "
          "InVehicle PickedLoa _index SkipForPrimaryProfessions", 1),
-        ("Bloodlust Boat DeathSkip Dontskipvid ExtraActionB InstanceQuest IsAdventureMap IsCampaignQuest "
+        ("Bloodlust Boat Tram Zeppelin DeathSkip Dontskipvid ExtraActionB InstanceQuest IsAdventureMap IsCampaignQuest "
          "MountVehicle NoArrow NoAutoFlightMap NoAutoAccept NoAutoTurnIn NonSkippableWaypoint ResetRoute "
-         "RouteCompleted SingleWaypointDisplayDistance SpecialETAHide UseGlider VehicleExit Hardcore AlliedRace", True),
+         "RouteCompleted SingleWaypointDisplayDistance SpecialETAHide UseGlider UseHSIfAvailable VehicleExit Hardcore AlliedRace", True),
         ("Done DoneDB PickUp PickUpDB QpartDB WaypointDB LeaveQuests GossipOptionIDs Zones OnlyInZones "
          "SkipInZones DontHaveSpell IsQuestReadyForTurnIn IsOneOfQuestsCompleted IsOneOfQuestsUncompleted "
          "IsOneOfQuestsCompletedOnAccount IsOneOfQuestsUncompletedOnAccount IsQuestsCompleted "
@@ -43,6 +43,9 @@ def examples():
     ):
         values.update((key, deepcopy(value)) for key in names.split())
     values.update({
+        "Dungeon": "RFC",
+        "KillNPC": {"npcID": 11520, "name": "Taragaman the Hungerer", "dungeonKey": "RFC"},
+        'SkipIfCooldown': seq({'itemID': 6948, 'operator': '<', 'seconds': 2, 'once': True}),
         "Faction": "Horde", "Race": seq("Orc", "Troll"), "Class": seq("WARRIOR", 3),
         "ClassNot": "MAGE", "ClassSpec": 253, "Gender": 3, "Event": "Remix",
         "Money": {"copper": 10, "operator": "<"},
@@ -52,14 +55,17 @@ def examples():
                              "operator": "<", "precision": 1, "allowMissing": False},
         "EquippedItem": {"slot": 16, "itemID": 123, "invert": True},
         "Collection": {"itemID": 123, "quantity": 2},
+        "SkillGoal": {"skillID": 8888, "rank": 42},
         "Skill": {"skill": "cooking", "rank": 50, "operator": ">=", "maximum": True},
         "AnyOf": seq({"Class": "MAGE"}, {"Not": {"HasSpell": 123}}),
         "AllOf": seq({"IsQuestCompleted": 1}, {"AnyOf": seq({"MinLevel": 5}, {"Hardcore": True})}),
         "Not": {"AllOf": seq({"HasAura": 1}, {"Money": {"copper": 10}})},
         "Note": seq("First instruction", "Second instruction"), "PreviewImages": seq("image.jpg"),
+        "FillerPreviewImages": {1: seq("optional-image.jpg")},
         "Coord": {"x": -42.5, "y": 123.5}, "Coords": seq({"Zone": 1, "x": 1, "y": 2}),
-        "ZoneStepTrigger": {"x": 1, "y": 2, "Range": 10},
-        "Button": {"123-1": 123}, "SpellButton": {"123-1": "Spell"},
+        "MapMarkers": seq({"x": 15, "y": 30}),
+        "ZoneStepTrigger": {"x": 1, "y": 2, "Range": 10, "mapID": 2},
+        "Button": {"123-1": 123}, "SpellButton": {"123-1": "Spell"}, "ItemTarget": "player",
         "UseItem": {"itemID": 123, "itemSpellID": 456}, "UseSpell": {"spellID": 123},
         "Treasure": {"questID": 123, "itemID": 456},
         "Achievement": {"achievementID": 123, "criteriaID": 456, "criteriaIndex": 1, "questID": 2},
@@ -80,6 +86,26 @@ class RouteSchemaTests(unittest.TestCase):
     def setUpClass(cls):
         cls.catalog = load_routes([])
         cls.schema = RouteSchema(cls.catalog)
+
+    def test_skill_goal_requires_positive_integer_rank_and_skill_id(self):
+        self.schema.step({"SkillGoal": {"skillID": 8888, "rank": 42}}, "step")
+        for goal in ({}, {"skillID": 8888}, {"rank": 42}, {"skillID": 0, "rank": 42},
+                     {"skillID": 8888, "rank": 0}, {"skillID": 8888, "rank": 4.2},
+                     {"skillID": 8888, "rank": True}, {"skillID": "8888", "rank": 42},
+                     {"skillID": 8888, "rank": 42, "quantity": 5},
+                     {"skillID": 8888, "rank": 42, "maximum": True}):
+            with self.subTest(goal=goal), self.assertRaises(InvalidRoute):
+                self.schema.step({"SkillGoal": goal}, "step")
+
+    def test_raid_icon_accepts_scalar_or_nonempty_npc_list(self):
+        for value in (12345, seq(12345, 67890), seq(12345, 12345), {"npcID": 12345},
+                      seq({"npcID": 12345, "questID": 42, "objectiveIndex": 2}, 67890)):
+            with self.subTest(value=value):
+                self.schema.step({"RaidIcon": value}, "step")
+        for value in (0, -1, 1.5, True, "12345", {}, seq(0), seq(1, "2"),
+                      {2: 12345}, {"npcID": 12345, "questID": 0}, seq(seq(12345))):
+            with self.subTest(invalid=value), self.assertRaises(InvalidRoute):
+                self.schema.step({"RaidIcon": value}, "step")
 
     def test_every_declared_option_has_positive_and_negative_examples(self):
         data = examples()
@@ -103,12 +129,102 @@ class RouteSchemaTests(unittest.TestCase):
                 with self.assertRaises(InvalidRoute):
                     self.schema.condition({"Not": {name: None}}, "condition")
 
+    def test_standalone_steps_cannot_contain_only_conditions_and_metadata(self):
+        stubs = [{}, {"_index": 1, "_comment": "No instruction"}]
+        stubs.extend({name: examples()[name], "_index": 1} for name in self.schema.condition_fields)
+        for step in stubs:
+            for content in (
+                {"steps": seq(step)},
+                {"steps": {}, "parallelSteps": seq({"conditions": {"Class": "MAGE"}, "steps": seq(step)})},
+                {"scenarios": seq({"scenarioID": 1, "steps": seq(step)})},
+                {"steps": seq({"scenarioID": 1, "steps": seq(step)})},
+            ):
+                with self.subTest(step=step, content=content), self.assertRaisesRegex(
+                    InvalidRoute, "standalone step requires content beyond conditions and metadata"
+                ):
+                    self.schema.validate("synthetic", {"label": "Synthetic", **content})
+
+        for instruction in (
+            {"Note": "Keep this instruction"}, {"ExtraLineText": "Keep this hint"},
+            {"Waypoint": 101}, {"BuyMerchant": seq({"itemID": 102, "quantity": 1})},
+            {"Done": seq(103)}, {"RouteCompleted": True}, {"PickUp": {}},
+        ):
+            with self.subTest(instruction=instruction):
+                self.schema.validate("synthetic", {"label": "Synthetic", "steps": seq(
+                    {"IsQuestUncompleted": 104, "_index": 1, **instruction})})
+
+    def test_dungeon_instance_ids_are_not_ui_map_ids(self):
+        for name in ("EnterInstance", "LeaveInstance"):
+            self.schema.step({name: {"dungeonKey": "ROL"}}, "step")
+            self.schema.step({name: {"mapID": 1}}, "step")
+            for invalid in ({}, {"instanceID": 16611}, {"dungeonKey": None}, {"dungeonKey": "unknown"}):
+                with self.subTest(name=name, invalid=invalid), self.assertRaises(InvalidRoute):
+                    self.schema.step({name: invalid}, "step")
+
+    def test_instance_entrance_selection_requires_dungeon_context(self):
+        self.schema.step({"EnterInstance": {"dungeonKey": "ROL", "entranceID": "invented-door"}}, "step")
+        for rule in ({"mapID": 1, "entranceID": "invented-door"},
+                     {"dungeonKey": "ROL", "entranceID": ""},
+                     {"dungeonKey": "ROL", "entranceID": 1}):
+            with self.subTest(rule=rule), self.assertRaises(InvalidRoute):
+                self.schema.step({"EnterInstance": rule}, "step")
+        with self.assertRaises(InvalidRoute):
+            self.schema.step({"LeaveInstance": {"dungeonKey": "ROL", "entranceID": "invented-door"}}, "step")
+
+    def test_recorded_world_coordinate_identity_is_optional_and_explicit(self):
+        self.schema.step({"Coord": {"x": 12.5, "y": -40, "mapID": 2512, "instanceID": 0}}, "step")
+        self.schema.step({"EnterScenario": {"mapID": 2269}}, "step")
+        self.schema.step({"LeaveScenario": {"mapID": 2269}, "NoArrow": True}, "step")
+        for invalid in ({"x": 1, "y": 2, "instanceID": -1}, {"x": 1, "y": 2, "instanceID": "2601"}):
+            with self.assertRaises(InvalidRoute):
+                self.schema.step({"Coord": invalid}, "step")
+
+    def test_static_search_markers(self):
+        self.schema.step({"MapMarkers": seq({"x": -10, "y": 20},
+                                            {"x": 30, "y": 40, "mapID": 1, "instanceID": 0})}, "step")
+        for invalid in ({}, seq({"x": 1}), seq({"x": 1, "y": float("nan")}),
+                        seq({"x": 1, "y": 2, "mapID": "1"}), "1,2"):
+            with self.subTest(value=invalid), self.assertRaises(InvalidRoute):
+                self.schema.step({"MapMarkers": invalid}, "step")
+
+    def test_filler_preview_images(self):
+        self.schema.step({"FillerPreviewImages": {12: seq("a.jpg", "b.jpg"), 34: seq("c.jpg")}}, "step")
+        for invalid in ("image.jpg", {0: seq("image.jpg")}, {"12": seq("image.jpg")},
+                        {12: {}}, {12: "image.jpg"}, {12: seq(1)}, {12: seq("")}):
+            with self.subTest(value=invalid), self.assertRaises(InvalidRoute):
+                self.schema.step({"FillerPreviewImages": invalid}, "step")
+
     def test_primary_profession_limit(self):
         for count in (1, 2, 3):
             self.schema.condition({"SkipForPrimaryProfessions": count}, "condition")
         for invalid in (0, -1, 1.5, True, "2", {}, seq(1, 2)):
             with self.subTest(value=invalid), self.assertRaises(InvalidRoute):
                 self.schema.condition({"SkipForPrimaryProfessions": invalid}, "condition")
+
+    def test_conditional_optional_merchant_purchases(self):
+        self.schema.step({"BuyMerchant": seq({"itemID": 2678, "quantityFromItemID": 6889,
+            "targetStock": True, "optional": True, "isSupply": True, "reserveCopper": 100,
+            "conditions": {"Skill": {"skill": "cooking", "rank": 50, "operator": "<"}}})}, "step")
+        for entry in ({"itemID": 1}, {"itemID": 1, "quantity": 1, "optional": "yes"},
+                      {"itemID": 1, "quantity": 1, "isSupply": "yes"},
+                      {"itemID": 1, "quantity": 1, "reserveCopper": -1},
+                      {"itemID": 1, "quantityFromItemID": 0},
+                      {"itemID": 1, "quantity": 1, "bagSlots": 0},
+                      {"itemID": 1, "quantity": 1, "conditions": {"BuyMerchant": seq(1)}}):
+            with self.subTest(entry=entry), self.assertRaises(InvalidRoute):
+                self.schema.step({"BuyMerchant": seq(entry)}, "step")
+        self.schema.step({"BuyMerchant": seq({"itemID": 1, "quantity": 1, "isSupply": False})}, "step")
+
+    def test_classic_ammunition_slot_conditions(self):
+        condition = {"EquippedItemStat": {"slot": 0, "stat": "LEVEL", "value": 30,
+                                           "operator": "<=", "allowMissing": True}}
+        self.schema.condition(condition, "condition")
+        self.schema.step({"BuyMerchant": seq({"itemID": 3030, "quantity": 400,
+                                              "conditions": condition})}, "step")
+        for slot in (-1, 0.5, 20):
+            with self.subTest(slot=slot), self.assertRaises(InvalidRoute):
+                self.schema.condition({"EquippedItemStat": {
+                    **condition["EquippedItemStat"], "slot": slot}}, "condition")
 
     def test_multiple_spell_buttons_for_one_quest_or_objective(self):
         for value in (2050, "Lesser Heal", seq(2050, 1243), seq(2050, "Power Word: Fortitude")):
@@ -118,6 +234,13 @@ class RouteSchemaTests(unittest.TestCase):
         for value in ({}, {2: 1243}, seq(2050, 0), seq(True), seq(""), seq(seq(2050)), seq(2050.5)):
             with self.subTest(value=value), self.assertRaises(InvalidRoute):
                 self.schema.step({"SpellButton": {"5648": value}}, "step")
+
+    def test_explicit_item_target_is_restricted_to_player(self):
+        self.schema.step({"UseItem": {"itemID": 101}, "ItemTarget": "player"}, "step")
+        self.schema.step({"Button": {"202": 101}, "ItemTarget": "player"}, "step")
+        for target in ("target", "mouseover", "[@player]", "", 1, True):
+            with self.subTest(target=target), self.assertRaises(InvalidRoute):
+                self.schema.step({"Button": {"202": 101}, "ItemTarget": target}, "step")
 
     def test_multiple_item_buttons_for_one_quest_or_objective(self):
         for value in (12345, seq(12345, 67890)):
@@ -160,16 +283,28 @@ class RouteSchemaTests(unittest.TestCase):
                 with self.subTest(option=name), self.assertRaises(InvalidRoute):
                     self.schema.step({name: mutated}, "step")
 
+    def test_collection_quantity_from_skill(self):
+        for goal in ({"skill": "cooking", "rank": 50}, {"skillID": 185, "rank": 10}):
+            self.schema.step({"LootItems": seq({"itemID": 769, "quantityFromSkill": goal})}, "step")
+        for goal in ({"rank": 50}, {"skill": "cooking"}, {"skill": "cooking", "rank": 0},
+                     {"skill": "cooking", "rank": 10, "unknown": True}):
+            with self.subTest(goal=goal), self.assertRaises(InvalidRoute):
+                self.schema.step({"LootItems": seq({"itemID": 769, "quantityFromSkill": goal})}, "step")
+
     def test_metadata_prefabs_and_scenarios(self):
         route = {"label": "Example", "category": "Campaign", "expansion": "Midnight", "gameVersion": "retail",
+                 "author": "APR", "authors": seq("One", "Two"), "community": True,
+                 "source": "community", "description": "A route description",
                  "mapID": 1, "conditions": {"Level": 10, "AnyOf": seq({"Hardcore": False})},
-                 "legacyLabels": seq("Old name"), "autoStartOnMap": True, "notSkippable": True,
+                 "legacyLabels": seq("Old name"), "levelRange": {"min": 12, "max": 18},
+                 "autoStartOnMap": True, "notSkippable": True,
                  "hiddenFromSelection": True, "temporary": True, "sojournerAchievementID": 1, "delve": {},
                  "steps": seq({"Note": "Example"}), "scenarios": seq({"label": "Scenario", "scenarioID": 1,
                      "index": 1, "steps": seq({"Note": "Example"})}),
                  "parallelSteps": seq({"conditions": {"Class": 1}, "steps": seq({"Note": "Example"})}),
-                 "requiredRoute": seq("previous"), "nextRoute": seq("next", {"route": "branch", "conditions": {"Race": "Orc"}}),
-                 "prefab": {"leveling": 1, "speedrun": {"index": 2, "conditions": {"MinLevel": 10}}}}
+                 "requiredRoute": seq("previous"),
+                 "nextRoute": seq("next", {"route": "branch", "conditions": {"Race": "Orc"}}),
+                 "prefab": {"leveling": 1, "speedrun": {"index": 2, "endLevel": 60, "conditions": {"MinLevel": 10}}}}
         self.assertEqual(set(route), set(self.schema.route_fields))
         self.schema.validate("test", route)
         for key in route:
@@ -177,10 +312,21 @@ class RouteSchemaTests(unittest.TestCase):
                 self.schema.validate("test", {**route, key: None})
         for patch in ({"extRoute": {}}, {"conditions": {"Not": {"HasSpell": 1}}},
                       {"prefab": {"leveling": {"index": 1, "conditons": {}}}},
+                      {"prefab": {"speedrun": {"index": 1, "endLevel": 0}}},
+                      {"prefab": {"speedrun": {"index": 1, "endLevel": "60"}}},
                       {"scenarios": seq({"scenarioID": 1, "steps": seq({"Unknown": True})})},
                       {"nextRoute": seq({"route": "next", "conditions": {"Done": seq(1)}})}):
             with self.subTest(patch=patch), self.assertRaises(InvalidRoute):
                 self.schema.validate("test", {**route, **patch})
+
+    def test_level_range_metadata(self):
+        for levels in ({"min": 4, "max": 12}, {"min": 13}, {"max": 18}, {"min": 9, "max": 9}):
+            with self.subTest(levels=levels):
+                self.schema.validate("fixture", {"label": "Invented", "steps": {}, "levelRange": levels})
+        for levels in ({}, {"min": 0}, {"max": True}, {"min": "8"}, {"min": 1.5},
+                       {"min": 20, "max": 19}, {"min": 4, "label": "text"}, seq(4, 12)):
+            with self.subTest(levels=levels), self.assertRaises(InvalidRoute):
+                self.schema.validate("fixture", {"label": "Invented", "steps": {}, "levelRange": levels})
 
     def test_supported_alternative_forms_and_empty_placeholders(self):
         for step in ({"LearnSkill": {"allAvailable": True}}, {"LearnSkill": {"spellID": 1}},
@@ -236,6 +382,16 @@ class RouteSchemaTests(unittest.TestCase):
                      {"NoArrow": 1}, {"PreviewImages": "image.jpg"}, {"TrigTextBad": "text"}):
             with self.subTest(step=step), self.assertRaises(InvalidRoute):
                 self.schema.step(step, "step")
+
+    def test_outdoor_kill_requires_explicit_map_and_dungeon_contexts_must_match(self):
+        outdoor = {"KillNPC": {"npcID": 3100, "name": "Boar"}, "Zone": 1411}
+        self.schema.step(outdoor, "step")
+        for invalid in ({"KillNPC": outdoor["KillNPC"]},
+                        {**outdoor, "Zone": seq(1411)},
+                        {**outdoor, "Dungeon": "RFC"},
+                        {"Dungeon": "RFC", "KillNPC": {"npcID": 11517, "name": "boss", "dungeonKey": "WC"}}):
+            with self.subTest(invalid=invalid), self.assertRaises(InvalidRoute):
+                self.schema.step(invalid, "step")
 
     def test_schema_covers_engine_condition_and_primary_action_names(self):
         sources = "\n".join((ROOT / path).read_text(encoding="utf8") for path in

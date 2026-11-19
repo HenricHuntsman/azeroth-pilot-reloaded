@@ -1,6 +1,6 @@
--- Lua cannot emulate WoW taint, but APR must never enter or mutate the
--- Blizzard tracker and must not anchor its secure action buttons to it.
-local function forbidden() error("APR must not hook, update or mutate Blizzard's tracker") end
+-- The legacy below layout remains read-only. Above/group translations are covered
+-- separately; neither mode may put APR's secure actions in the tracker's anchor chain.
+local function forbidden() error("Legacy below attachment must not hook, update or mutate Blizzard's tracker") end
 local originalDofile = dofile
 function dofile(path)
     if path == "APR-Core/ui/route/CurrentStep.lua" then hooksecurefunc = forbidden end
@@ -13,11 +13,18 @@ local reads = 0
 local function trackerFrame(state)
     local methods = {
         IsShown = function() return state.shown end,
-        GetCenter = function() reads = reads + 1; return state.x, state.y end,
+        GetCenter = function()
+            reads = reads + 1
+            return state.x, state.y
+        end,
         GetBottom = function() return state.y end,
         GetEffectiveScale = function() return state.scale end,
-        Update = forbidden, MarkDirty = forbidden, SetPoint = forbidden,
-        SetScript = forbidden, HookScript = forbidden, SetScale = forbidden,
+        Update = forbidden,
+        MarkDirty = forbidden,
+        SetPoint = forbidden,
+        SetScript = forbidden,
+        HookScript = forbidden,
+        SetScale = forbidden,
     }
     return setmetatable({}, { __index = methods, __newindex = forbidden })
 end
@@ -25,8 +32,11 @@ local header = { shown = true, x = 400, y = 700, scale = 1.5 }
 local first = { shown = true, x = 400, y = 600, scale = 1.5 }
 local last = { shown = true, x = 400, y = 500, scale = 1.5 }
 local trackerData = {
-    Header = trackerFrame(header), modules = { trackerFrame(first), trackerFrame(last) },
-    Update = forbidden, MarkDirty = forbidden, SetPoint = forbidden,
+    Header = trackerFrame(header),
+    modules = { trackerFrame(first), trackerFrame(last) },
+    Update = forbidden,
+    MarkDirty = forbidden,
+    SetPoint = forbidden,
 }
 ObjectiveTrackerFrame = setmetatable({}, { __index = trackerData, __newindex = forbidden })
 local secret = {}
@@ -43,10 +53,14 @@ profile.currentStepAttachFrameToQuestLog = true
 tick(0.1)
 assert(reads == 0, "Tracker observation is throttled")
 tick(0.1)
-assert(panel.point[1] == "TOP" and panel.point[2] == UIParent and panel.point[3] == "BOTTOMLEFT",
-    "APR anchors only to UIParent, never to Blizzard's tracker or modules")
-assert(panel.point[4] == 800 and panel.point[5] == 965,
-    "Last visible module position is converted to UIParent's coordinate scale")
+assert(
+    panel.point[1] == "TOP" and panel.point[2] == UIParent and panel.point[3] == "BOTTOMLEFT",
+    "APR anchors only to UIParent, never to Blizzard's tracker or modules"
+)
+assert(
+    panel.point[4] == 800 and panel.point[5] == 965,
+    "Last visible module position is converted to UIParent's coordinate scale"
+)
 local anchors, layouts = panel.anchors, env.layouts()
 tick()
 assert(panel.anchors == anchors and env.layouts() == layouts, "Unchanged geometry does not trigger layout")

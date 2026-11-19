@@ -81,7 +81,7 @@ APR.RouteQuestStepList["85-Intro-Legion"] = {
             ExtraLineText = "NPC_TELEPORT",
             Coord = { x = -5016.8, y = 1438.9 },
             GossipOptionIDs = { 46562 },
-            RaidIcon = 113118,
+            RaidIcon = { { npcID = 113118, questID = 40518, objectiveIndex = 1 } },
             Zone = 1,
             _index = 10,
         },
@@ -1318,6 +1318,7 @@ APR.RouteQuestStepList["634-Stormheim - H"] = {
             GossipOptionIDs = { 44644 },
             ExtraLineText = "TALK_DREAD_RIDER_CULLEN",
             Coord = { x = 1554, y = 3191.5 },
+            IsQuestUncompleted = 38872,
             _index = 170,
         },
         {
@@ -1781,6 +1782,7 @@ APR.RouteQuestStepList["634-Stormheim - H"] = {
             Waypoint = 42447,
             Coord = { x = 1902.4, y = 4008.6 },
             GossipOptionIDs = { 45871 },
+            IsQuestUncompleted = 42447,
             Zone = 634,
             _index = 243,
         },
@@ -2117,7 +2119,7 @@ APR.RouteQuestStepList["680-Nightborne-intro"] = {
         {
             Qpart = { [50303] = { 1 } },
             Coord = { x = -4214.6, y = 1555.9 },
-            RaidIcon = 167032,
+            RaidIcon = { { npcID = 167032, questID = 50303, objectiveIndex = 1 } },
             Zone = 85,
             _index = 7,
         },
@@ -2174,7 +2176,7 @@ APR.RouteQuestStepList["652-HighmountainTauren-intro"] = {
         {
             Qpart = { [50319] = { 1 } },
             Coord = { x = -4213.8, y = 1556.9 },
-            RaidIcon = 167032,
+            RaidIcon = { { npcID = 167032, questID = 50319, objectiveIndex = 1 } },
             Zone = 85,
             _index = 5,
         },

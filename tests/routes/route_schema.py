@@ -8,6 +8,11 @@ explicit grammar rule here. This validates declarations, not quest story order.
 
 import math
 import re
+from pathlib import Path
+
+
+DUNGEON_KEYS = frozenset(key for path in (Path(__file__).resolve().parents[2] / "APR-Core/data/Dungeons").glob("*.lua")
+                        for key in re.findall(r"^    ([A-Z][A-Z0-9_]*) = \{", path.read_text(encoding="utf-8-sig"), re.M))
 
 
 class InvalidRoute(ValueError):
@@ -112,14 +117,15 @@ class RouteSchema:
             return enum(catalog.enums[name].values())
 
         level = union(number(1), enum(catalog.profiles),
-                      obj({"level": ID, "xp": number(integer=True)}, required=("level", "xp")))
+                      obj({"level": ID, "xp": number(integer=True), "questLogXP": IDS}, required=("level", "xp")))
         reputation = obj({"factionID": ID, "level": ID, "type": constants("REPUTATION_TYPE")},
                          required=("factionID", "level"))
         item = obj({"itemID": ID, "quantity": ID}, required=("itemID",))
         class_value = enum((*catalog.enums["Classes"].values(),
                             *(key.upper().replace(" ", "") for key in catalog.enums["Classes"])))
         race = union(constants("RACES"), ID)
-        equipped_stat = obj({"slot": SLOT, "stat": TEXT, "value": NUMBER,
+        # Classic ammunition uses inventory slot zero.
+        equipped_stat = obj({"slot": number(0, 19, integer=True), "stat": TEXT, "value": NUMBER,
                              "operator": OPERATOR, "precision": COUNT, "allowMissing": BOOL},
                             required=("slot", "stat", "value"))
         equipped_item = obj({"slot": SLOT, "itemID": ID, "invert": BOOL}, required=("slot",))
@@ -133,7 +139,7 @@ class RouteSchema:
             "ClassSpec": constants("Specs"), "Gender": enum((1, 2, 3)),
             "Event": constants("EVENTS"), "BeLvl": number(1),
             "Money": obj({"copper": COUNT, "operator": OPERATOR}, required=("copper",)),
-            "VendorMoney": obj({"copper": COUNT, "operator": OPERATOR, "includeEquipped": BOOL,
+            "VendorMoney": obj({"copper": COUNT, "operator": OPERATOR, "includeEquipped": BOOL, "junkOnly": BOOL,
                                 "equippedSlots": array(SLOT, 1)}, required=("copper",)),
             "ItemCount": obj({"itemID": ID, "itemIDs": IDS, "count": COUNT,
                               "operator": OPERATOR, "includeBank": BOOL, "includeUsableToys": BOOL},
@@ -172,15 +178,20 @@ class RouteSchema:
         self.route_condition = obj(route_conditions)
 
         self.step_fields = dict(self.condition_fields)
+        self.step_fields['SkipIfCooldown'] = array(union(
+            obj({'itemID': ID, 'operator': enum(('<', '>')), 'seconds': number(0), 'once': BOOL},
+                required=('itemID', 'operator', 'seconds')),
+            obj({'spellID': ID, 'operator': enum(('<', '>')), 'seconds': number(0), 'once': BOOL},
+                required=('spellID', 'operator', 'seconds'))), 1)
         for name in ("ChromiePick DropQuest ExitTutorial GetFP GroupTask LearnProfession LeaveQuest "
                      "NpcDismount SetHS UseDalaHS UseFlightPath UseGarrisonHS UseHS WarMode Waypoint "
-                     "DenyNPC MerchantNPC RaidIcon SpellTrigger Zone NodeID QuestLineSkip ExtraLine "
+                     "DenyNPC MerchantNPC SpellTrigger Zone NodeID QuestLineSkip ExtraLine "
                      "Gossip Brewery SparringRing").split():
             self.step_fields[name] = ID
-        for name in ("Bloodlust Boat DeathSkip Dontskipvid ExtraActionB InstanceQuest IsAdventureMap "
+        for name in ("Bloodlust Boat Tram Zeppelin DeathSkip Dontskipvid ExtraActionB InstanceQuest IsAdventureMap "
                      "IsCampaignQuest MountVehicle NoArrow NoAutoFlightMap NoAutoAccept NoAutoTurnIn "
                      "NonSkippableWaypoint ResetRoute RouteCompleted SingleWaypointDisplayDistance "
-                     "SpecialETAHide UseGlider VehicleExit").split():
+                     "SpecialETAHide UseGlider UseHSIfAvailable VehicleExit").split():
             self.step_fields[name] = BOOL
         for name in "Done DoneDB PickUp PickUpDB QpartDB WaypointDB LeaveQuests GossipOptionIDs".split():
             self.step_fields[name] = array(ID)
@@ -190,7 +201,7 @@ class RouteSchema:
             self.step_fields[name] = number(0)
         for name in "InVehicle PickedLoa".split():
             self.step_fields[name] = enum((1, 2))
-        xy = obj({"x": NUMBER, "y": NUMBER}, required=("x", "y"))
+        xy = obj({"x": NUMBER, "y": NUMBER, "mapID": ID, "instanceID": COUNT}, required=("x", "y"))
         zone_aliases = {key: ID for key in ("Zone", "zone", "mapID", "MapID", "uiMapID", "UiMapID")}
         coord_entry = union(obj({"x": NUMBER, "y": NUMBER, **zone_aliases}, required=("x", "y")),
                             obj({"Coord": xy, **zone_aliases}, required=("Coord",)))
@@ -198,13 +209,21 @@ class RouteSchema:
         objective = scalar("quest ID or quest-objective key", lambda v:
                            isinstance(v, str) and re.fullmatch(r"[1-9]\d*(?:-\d+)?", v) is not None)
         self.step_fields.update({
+            "RaidIcon": union(ID, obj({"npcID": ID, "questID": ID, "objectiveIndex": ID}, required=("npcID",)), array(union(ID, obj({"npcID": ID, "questID": ID, "objectiveIndex": ID}, required=("npcID",))), 1)),
+            "Dungeon": enum(DUNGEON_KEYS),
+            "KillNPC": obj({"npcID": ID, "name": TEXT, "dungeonKey": enum(DUNGEON_KEYS)}, required=("npcID", "name")),
             "Name": TEXT, "Note": union(TEXT, array(TEXT, 1)), "PreviewImages": array(TEXT, 1),
+            "FillerPreviewImages": mapping(ID, array(TEXT, 1)),
             "_index": ID, "_comment": TEXT, "Grind": level,
-            "Coord": union(xy, multi_coord), "Coords": multi_coord,
-            "ZoneStepTrigger": obj({"x": NUMBER, "y": NUMBER, "Range": number(0)},
-                                   required=("x", "y", "Range")),
+            "Coord": union(xy, multi_coord), "Coords": multi_coord, "MapMarkers": array(xy, 1),
+            # StepUtils.NormalizeZoneList accepts navigation-only Zone lists.
+            "Zone": union(ID, IDS),
+            "ZoneStepTrigger": union(
+                obj({"x": NUMBER, "y": NUMBER, "Range": number(0), "mapID": ID}, required=("x", "y", "Range")),
+                obj({"mapID": ID}, required=("mapID",))),
             "Button": mapping(objective, union(ID, array(ID, 1))),
             "SpellButton": mapping(objective, union(ID, TEXT, array(union(ID, TEXT), 1))),
+            "ItemTarget": enum(("player",)),
             "UseItem": obj({"itemID": ID, "questID": ID, "itemSpellID": ID}, required=("itemID",)),
             "UseSpell": obj({"spellID": ID, "questID": ID}, required=("spellID",)),
             "Treasure": obj({"questID": ID, "itemID": ID}, required=("questID",)),
@@ -215,8 +234,9 @@ class RouteSchema:
             "Group": obj({"questID": ID, "Number": ID}, required=("questID", "Number")),
             "DroppableQuest": obj({"Qid": ID, "MobId": ID, "Text": TEXT}, required=("Qid", "MobId", "Text")),
             "Buffs": array(obj({"spellId": ID, "tooltipMessage": TEXT}, required=("spellId",)), 1),
-            "LootMoney": obj({"copper": ID, "includeEquipped": BOOL, "equippedSlots": array(SLOT, 1)},
+            "LootMoney": obj({"copper": ID, "includeEquipped": BOOL, "junkOnly": BOOL, "equippedSlots": array(SLOT, 1)},
                              required=("copper",)),
+            "SkillGoal": obj({"skillID": ID, "rank": ID}, required=("skillID", "rank")),
             "Reputation": reputation,
             "SpellETA": obj({"spellID": ID, "itemID": ID, "seconds": number(0)},
                             required=("seconds",), choices=(("spellID", "itemID"),)),
@@ -230,9 +250,24 @@ class RouteSchema:
         for name in "TakePortal EnterInstance LeaveInstance EnterScenario DoScenario LeaveScenario".split():
             self.step_fields[name] = obj({"questID": ID, "mapID": ID}, required=("mapID",))
         self.step_fields["TakePortal"] = obj({"questID": ID, "mapID": ID}, choices=(("mapID", "questID"),))
+        for name in ("EnterInstance", "LeaveInstance"):
+            fields = {"questID": ID, "mapID": ID, "dungeonKey": enum(DUNGEON_KEYS)}
+            if name == "EnterInstance":
+                fields["entranceID"] = TEXT
+            self.step_fields[name] = obj(fields,
+                                         choices=(("mapID", "dungeonKey"),))
         for name in "BuyMerchant LootItems".split():
-            self.step_fields[name] = array(obj({"itemID": ID, "quantity": ID, "questID": ID},
-                                               required=("itemID", "quantity") if name == "BuyMerchant" else ("itemID",)), 1)
+            fields = {"itemID": ID, "quantity": ID, "questID": ID}
+            if name == "LootItems":
+                fields["includeBank"] = BOOL
+                fields["quantityFromSkill"] = obj({"skill": union(ID, TEXT), "skillID": ID, "rank": ID},
+                                                   required=("rank",), choices=(("skill", "skillID"),))
+            if name == "BuyMerchant":
+                fields.update(targetStock=BOOL, optional=BOOL, isSupply=BOOL, reserveCopper=COUNT, conditions=condition,
+                              quantityFromItemID=ID, bagSlots=number(1, 40, integer=True))
+            self.step_fields[name] = array(obj(fields,
+                                               required=("itemID",),
+                                               choices=(("quantity", "quantityFromItemID"),) if name == "BuyMerchant" else ()), 1)
         entry = union(ID, obj({"itemID": ID, "text": TEXT, "Text": TEXT}, required=("itemID",)))
         for name in "SellItems BankDeposit BankWithdraw DestroyItems".split():
             fields = {"items": array(entry, 1), "npcID": ID, "text": TEXT, "Text": TEXT}
@@ -244,24 +279,52 @@ class RouteSchema:
                 ["items", "junk", "equippedSlots"] if name == "SellItems" else ["items"]),)))
         self.step = obj(self.step_fields, patterns=((r"ExtraLineText\d*", union(TEXT, array(TEXT, 1))),
                                                    (r"TrigText\d*", TEXT)))
-        steps = array(self.step)
+        step_shape = self.step
+        def flight_arrival_step(value, path):
+            step_shape(value, path)
+            entry = value.get("EnterInstance")
+            if entry and entry.get("entranceID") and not entry.get("dungeonKey"):
+                fail(path + ".EnterInstance.entranceID", "A selected entrance requires dungeonKey")
+            kill = value.get("KillNPC")
+            if kill and value.get("Dungeon") and kill.get("dungeonKey") != value["Dungeon"]:
+                fail(path + ".KillNPC.dungeonKey", "KillNPC must match its Dungeon context")
+            if kill and not kill.get("dungeonKey") and not value.get("Dungeon") and type(value.get("Zone")) is not int:
+                fail(path + ".Zone", "Outdoor KillNPC requires a single explicit UI map ID")
+            trigger = value.get("ZoneStepTrigger")
+            if trigger and set(trigger) == {"mapID"} and not (value.get("UseFlightPath") or value.get("Waypoint")):
+                fail(path + ".ZoneStepTrigger", "Map-only arrivals require a flight or waypoint; boats, trams and zeppelins need coordinates")
+        self.step = flight_arrival_step
+        def declared_step(value, path):
+            self.step(value, path)
+            # Predicates select an instruction; they cannot advance or render
+            # anything on their own. Keep raw field checks usable independently.
+            if not value.keys() - self.condition_fields.keys() - {"_index", "_comment"}:
+                fail(path, "standalone step requires content beyond conditions and metadata")
+
+        steps = array(declared_step)
         scenario = obj({"label": TEXT, "scenarioID": ID, "index": ID, "steps": steps},
                        required=("scenarioID", "steps"))
         self.route_fields = {
             "category": constants("CATEGORIES"), "expansion": constants("EXPANSIONS"),
             "gameVersion": constants("GAME_VERSIONS"), "label": TEXT, "mapID": COUNT,
+            "author": TEXT, "authors": array(TEXT, 1), "community": BOOL,
+            "source": enum(("apr", "community")), "description": TEXT,
             "legacyLabels": array(TEXT, 1), "conditions": self.route_condition,
+            "levelRange": obj({"min": ID, "max": ID}, choices=(("min", "max"),)),
             "autoStartOnMap": BOOL, "notSkippable": BOOL, "hiddenFromSelection": BOOL, "temporary": BOOL,
             "sojournerAchievementID": ID, "delve": obj({}),
             "steps": union(steps, array(scenario, 1)), "scenarios": array(scenario),
-            "parallelSteps": array(obj({"conditions": condition, "steps": array(self.step, 1)}, required=("steps",))),
+            "parallelSteps": array(obj({"conditions": condition, "steps": array(declared_step, 1), "repeatable": BOOL}, required=("steps",))),
             "requiredRoute": array(TEXT),
             "nextRoute": array(union(TEXT, obj({"route": TEXT, "conditions": condition}, required=("route",)))),
             "prefab": mapping(constants("PREFAB_TYPES"), union(NUMBER,
-                              obj({"index": NUMBER, "conditions": condition}, required=("index",)))),
+                              obj({"index": NUMBER, "conditions": condition, "endLevel": ID}, required=("index",)))),
         }
         self.route = obj(self.route_fields, required=("label",), choices=(("steps", "scenarios"),))
 
     def validate(self, key, route):
         TEXT(key, "route key")
         self.route(route, key)
+        levels = route.get("levelRange", {})
+        if "min" in levels and "max" in levels and levels["min"] > levels["max"]:
+            fail(key + ".levelRange", "minimum exceeds maximum")

@@ -1,5 +1,9 @@
 -- Exercise the structured Forever API, with legacy globals deliberately unavailable.
+function LibStub()
+    return { GetLocale = function() return {} end }
+end
 APR = {}
+dofile("APR-Core/utils/PlayerUtils.lua")
 dofile("APR-Core/utils/RouteConditions.lua")
 local info = { skillID = 185, name = "Cuisine", isHeader = false, rank = 75, maxRank = 150 }
 local function unexpectedLegacy() error("Available C_ API must take priority") end
@@ -7,7 +11,9 @@ GetNumSkillLines, GetSkillLineInfo, GetProfessions, GetSpellInfo =
     unexpectedLegacy, unexpectedLegacy, unexpectedLegacy, unexpectedLegacy
 C_Spell = { GetSpellInfo = function() return { name = "Cuisine" } end }
 C_SkillInfo = {
-    GetSkillLineInfoByID = function(id) if id == 185 then return info end end,
+    GetSkillLineInfoByID = function(id)
+        if id == 185 then return info end
+    end,
     GetNumSkillLines = function() return 3 end,
     GetSkillLineInfo = function(index)
         if index == 1 then return { name = "Cuisine", isHeader = true } end
@@ -56,9 +62,11 @@ GetProfessions = nil
 
 -- The skill-line fallback is independent of locale and collapsed UI headers.
 local learned = { [171] = 1, [333] = 75, [185] = 100, [129] = 50, [356] = 20, [762] = 75 }
-C_SkillInfo = { GetSkillLineInfoByID = function(id)
-    if learned[id] then return { skillID = id, name = "Localized", isHeader = false, rank = learned[id] } end
-end }
+C_SkillInfo = {
+    GetSkillLineInfoByID = function(id)
+        if learned[id] then return { skillID = id, name = "Localized", isHeader = false, rank = learned[id] } end
+    end,
+}
 assert(APR:GetPrimaryProfessionCount() == 2, "Secondary skills and riding must be excluded")
 learned[333] = 0
 assert(APR:GetPrimaryProfessionCount() == 1, "Unlearned skills must not count")
@@ -76,3 +84,11 @@ assert(APR:GetPrimaryProfessionCount() == 1, "Legacy skill lines only count prim
 GetNumSkillLines, GetSkillLineInfo = nil, nil
 assert(APR:GetPrimaryProfessionCount() == 0)
 print("Skills: modern tables, collapsed headers, API priority and legacy fallbacks passed")
+
+-- Structured results may arrive before the numeric rank is populated.
+C_SkillInfo = { GetSkillLineInfoByID = function() return { name = "Invented", maxRank = 300 } end }
+assert(APR:GetRouteSkill({ skillID = 8888 }) == 0)
+local rank, name = APR:GetRouteSkill({ skillID = 8888 })
+assert(rank == 0 and name == "Invented", "Missing rank remains safe while the native localized name survives")
+C_SkillInfo.GetSkillLineInfoByID = function() return { isHeader = true, name = "Header", rank = 300 } end
+assert(APR:GetRouteSkill({ skillID = 8888 }) == 0, "Headers never satisfy a rank goal")

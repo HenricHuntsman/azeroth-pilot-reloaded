@@ -17,6 +17,7 @@ concurrency:
 jobs:
   translations:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     permissions:
       contents: read
@@ -43,7 +44,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.x"
+          python-version: "3.13"
 
       # --------------------------------------------------
       # Install Chrome system dependencies (CRITICAL)
@@ -71,8 +72,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y wget gnupg
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo install -d -m 0755 /etc/apt/keyrings
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor | sudo tee /etc/apt/keyrings/google-chrome.gpg >/dev/null
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo chmod a+r /etc/apt/keyrings/google-chrome.gpg
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
 
@@ -88,11 +91,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests python-dotenv pydoll-python beautifulsoup4
+          python -m pip install -r .github/scripts/requirements-localization.txt
 
       - name: Run localization notification tests
         run: |
-          python -m unittest discover -s tests/scripts -p 'test_localization_post_discord.py'
+          python -m unittest discover -s tests/scripts -p 'test_*localization*.py'
 
       # -------------------------------------------------------------------
       # Run localization scraper
@@ -117,4 +120,3 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_LOCALES_WEBHOOK }}
         run: |
           python .github/scripts/localization_post_discord.py --send "$RUNNER_TEMP/localization-message.txt"
-

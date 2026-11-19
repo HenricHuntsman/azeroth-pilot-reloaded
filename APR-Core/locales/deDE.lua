@@ -1,4 +1,4 @@
-﻿local L = LibStub("AceLocale-3.0"):NewLocale("APR", "deDE")
+local L = LibStub("AceLocale-3.0"):NewLocale("APR", "deDE")
 if not L then return end
 
 -- Author: Kamian
